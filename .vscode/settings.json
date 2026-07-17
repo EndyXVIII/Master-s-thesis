@@ -3,4 +3,5 @@
     "latex-workshop.latex.external.build.args": [
         "thesis.tex"
     ]
+    "latex-workshop.latex.path": "/Library/TeX/texbin"
 }
