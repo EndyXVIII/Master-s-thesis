@@ -1,28 +1,22 @@
 \cleardoublepage
 \phantomsection
-\pdfbookmark{Sommario}{Sommario}
-\begingroup
-\let\clearpage\relax
-\let\cleardoublepage\relax
-\let\cleardoublepage\relax
+\pdfbookmark{Summary}{Summary}
 
 \chapter*{Summary}
+\markboth{Summary}{Summary}
 
-Il presente documento descrive il lavoro svolto durante il periodo di stage, della durata di circa trecento ore, dal laureando Pinco Pallino presso l'azienda Azienda S.p.A.
-Gli obbiettivi da raggiungere erano molteplici.\\
-In primo luogo era richiesto lo sviluppo di ...
-In secondo luogo era richiesta l'implementazione di un ...
-Tale framework permette di registrare gli eventi di un controllore programmabile, quali segnali applicati
-Terzo ed ultimo obbiettivo era l'integrazione ...
+\begingroup
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.8em}
 
-%\vfill
+Over the past several years, multimodal artificial intelligence has seen a substantial rise in its success in mapping vision and text to shared latent spaces. Nevertheless, extending these alignment frameworks to three-dimensional (3D) geometric representations has remained a considerable open problem given the inherent topological dissimilarity and non-Euclidean properties of 3D point clouds when compared to language structures.
 
-%\selectlanguage{english}
-%\pdfbookmark{Abstract}{Abstract}
-%\chapter*{Abstract}
+This Master's thesis provides a thorough empirical and theoretical investigation into cross-modal latent alignment between uni-modal 3D objects and text latent spaces. We train a system on a large scale dataset of 3D objects and their corresponding textual descriptions, extracts features across several multi-modal backbones such as PointNet, OpenCLIP, RoBERTa, and BERT to characterize modalities into high dimensional global embedding.
 
-%\selectlanguage{italian}
+Firstly, we conduct a strict replication and verification of the state-of-the-art supervised linear alignment framework \textcite{hadgi2025escaping}. An in-depth series of anchor pairs are projected to a common low dimensional shared space through an exact SVD-based Canonical Correlation Analysis (CCA), and subsequently an affine least-squares solution to derive a robust benchmark for this problem. Tested on a hold-out query set, averaged over multiple random initializations, our replication of this system confirms that supervised linear transformations effectively expose shared geometric underlying structures between the modalities.
 
+Secondly, we extensively explore unsupervised and weakly-supervised Optimal Transport (OT) based alignment frameworks including the use of Gromov-Wasserstein (GW) distance metrics \cite{vayer2019optimal}. We analyze the performance of various GW variants such as Sliced GW, Rotation-Invariant SGW, Semi-Supervised RISGW, Fused GW and Low-Rank GW, integrating with recent improvements on intra-domain scale-matching normalization presented by \textcite{li2026scale}. Our results in extensive independent ablation studies demonstrate that all unsupervised GW approaches underperformed consistently at aligning latent spaces with random retrieval rates on all metrics.
+
+Thirdly, we explain these failed alignment outcomes using a theoretical and structural analysis approach. Through the examination of transport plan entropy, mass concentration ratio, and self-structural cost evaluation metrics, we prove that 3D geometric point cloud spaces and text latent spaces fundamentally violate the inherent assumption of structural isometry. Because intra-domain distributions lack any form ofisometric correlation, the quadratic solvers for unsupervised optimal transport are stuck at non-informative and uniform local minima, demonstrating that explicitly based on anchor supervision is critical for successful cross-modal 3D-text alignment, and marking the mathematical limitations of relational optimal transport in multimodal learning.
 \endgroup
-
 \vfill

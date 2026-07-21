@@ -1,4 +1,6 @@
+
 \PassOptionsToPackage{dvipsnames}{xcolor} % PDF/A colors
+
 
 \usepackage{colorprofiles}
 
@@ -45,7 +47,7 @@
 
 \usepackage{subcaption}                 % subfigures and subtables
 
-\usepackage[english]{varioref}          % English page references (CHANGED FROM ITALIAN)
+\usepackage[english]{varioref}          % English page references
 
 \usepackage{booktabs}                   % tables
 \usepackage{tabularx}                   % fixed-width tables
@@ -54,7 +56,9 @@
 
 \usepackage[toc, acronym]{glossaries}   % glossary and acronyms
 
-\usepackage[backend=biber,style=verbose-ibid,hyperref,backref]{biblatex}
+% BIBLIOGRAFIA CON STILE AUTORE-ANNO
+\usepackage[backend=biber,style=numeric,sorting=none,hyperref,backref]{biblatex}
+
 
 \usepackage{layaureo}                   % optimized margins for A4
 \usepackage{fancyhdr}
