@@ -3,13 +3,79 @@
 
 \section{Dataset: Objaverse}
 \label{sec:dataset_objaverse}
+
+To gauge the structural alignment between 3D object shapes and text descriptions, a massive dataset of multimodal paired data is requisite. For this effort, we elected to utilize Objaverse \cite{deitke2023objaverse}, which is the most extensive public repository of multimodal 3D models paired with natural language captions generated from the Cap3D captioning framework \cite{luo2023scalable}. Unlike earlier, restricted synthetic datasets only supporting limited classes of fixed, rigid objects, Objaverse provides a comprehensive, realistic geometric and semantic distribution well-suited for analyzing the correlation of the various cross-modal latent spaces.
+
+\begin{figure}[htpb]
+    \centering
+    % Inserisci l'immagine che hai scaricato nella cartella 'images/'
+    \includegraphics[width=\linewidth]{objaverse.png}
+    \caption{Sample objects from the Objaverse dataset alongside their textual annotations. This paired structure provides the foundational multimodal data required to supervise and evaluate 3D-text latent space alignment.}
+    \label{fig:objaverse_sample}
+\end{figure}
+
 \subsection{Feature Extraction Pipeline}
+\label{subsec:feature_pipeline}
+
+The experimental workflow was instantiated on the University of Padova’s high-performance computing (HPC) cluster, \texttt{labsrv7}. We distributed feature extraction as well as pair alignment across NVIDIA A100 (20GB MIG), Tesla V100 and Tesla T4 GPUs via use of the Slurm workload management system.
+
+We begin by sampling $100{,}000$ 3D objects from the Objaverse dataset. Before extracting geometric features, each 3D mesh was standardized: we uniformly sampled $2{,}048$ surface points, then centered each sample by subtracting the point-cloud’s mean and normalized by taking the maximum value along its euclidean dimensions. The feature extraction pipeline efficiently processes objects in batches of $10{,}000$ objects and features an auto-resume mechanism in case a node failure or job interrupt occurs. After filtering out meshes containing an error and samples with insufficient or nonsensical associated text, we arrived at a set of $46{,}675$ paired samples that had a clean textual annotation for all items across every modality.
+
+% ---------------------------------------------------------
+% PLACEHOLDER PER IL TUO DIAGRAMMA DRAW.IO (Opzionale)
+% ---------------------------------------------------------
+\begin{figure}[htpb]
+    \centering
+    % \includegraphics[width=\linewidth]{images/extraction_pipeline.png}
+    \framebox(\textwidth, 150){[Image Placeholder: extraction\_pipeline.png]}
+    \caption{Overview of the end-to-end feature extraction pipeline. 3D meshes are standardized into 2048-point clouds before being processed by the 3D encoders, while text captions are independently embedded by language models.}
+    \label{fig:extraction_pipeline}
+\end{figure}
+
 \subsection{Anchor Pairs and Query Protocol}
+\label{subsec:anchor_protocol}
+
+In conjunction with the approach employed by \textcite{hadgi2025escaping}, we extract the alignment spaces and evaluate the representations themselves utilizing a strictly-defined subset partition of the dataset to define an anchoring subset and a querying subset, composed of $n_A = 30{,}000$ and $500$ matched pairs respectively. This allows explicit training for Canonical Correlation Analysis (CCA) projection and affine-mapping construction from the canonical directions whilst, at the same time, maintaining unseen objects used exclusively to evaluate the quality of the generated alignments. All evaluated quantitative results were produced by taking the mean over three independent data splits defined by these anchor/query partitions.
 
 \section{Encoders}
 \label{sec:encoders_setup}
-\subsection{3D Encoders: PointNet and SparseConv}
-\subsection{Text Encoders: CLIP, RoBERTa, BERT}
 
+To thoroughly investigate how different neural architectures shape their resulting latent spaces, we set up a diverse array of feature extractors. Our selection strategy was not necessarily aimed at pushing state-of-the-art performance, but rather at understanding how architectural priors---such as unimodal versus multimodal pre-training---dictate the geometric topology of the embedded data.
+
+\subsection{3D Encoders: PointNet and SparseConv}
+\label{subsec:3d_encoders}
+
+Processing 3D geometries introduces unique challenges, primarily because raw point clouds lack a regular grid structure and are strictly permutation invariant. To handle our standardized $2{,}048$-point samples, we deployed two fundamentally different geometric backbones.
+
+We relied on PointNet as our primary pre-trained extractor. PointNet directly consumes the raw $(x, y, z)$ coordinates, passing them through shared Multi-Layer Perceptrons (MLPs) and eventually using a symmetric max-pooling function to aggregate global shape features. This process yields a robust $1024$-dimensional feature vector. Its straightforward, global approach makes it an excellent baseline for latent space analysis, as the resulting geometry is not overly distorted by hierarchical inductive biases.
+
+To contrast this, we also integrated a Sparse Convolutional Network (SparseConv). Unlike PointNet’s global pooling, SparseConv discretizes the 3D space into a sparse voxel grid and applies convolutions exclusively to occupied regions, which is theoretically much better at capturing fine-grained local geometries. We configured this backbone to output $512$-dimensional embeddings. Notably, as we will discuss in the baseline evaluations, we deliberately utilized SparseConv without pre-training (random weight initialization). This specific experimental choice allows us to isolate and observe the raw alignment capabilities of the spatial architecture itself, entirely separated from learned feature representations.
+
+\subsection{Text Encoders: CLIP, RoBERTa, and BERT}
+\label{subsec:text_encoders}
+
+For the textual modality, the central research question is whether purely linguistic representations can be mapped to 3D geometries via optimal transport, or if explicit visual pre-training is a strict prerequisite for cross-modal alignment. To cover this spectrum, we extracted features using three distinct transformer-based models.
+
+Our strongest text backbone is the encoder derived from OpenCLIP (specifically the ViT-bigG-14 variant). Because CLIP is contrastively trained on massive image-text pairs, its latent space inherently encodes physical and visual semantics. We hypothesize that this underlying "visual grounding" makes its text embeddings significantly more compatible with 3D structural spaces.
+
+To evaluate purely linguistic spaces, we extracted text embeddings using BERT and RoBERTa. These models were trained strictly on masked language modeling objectives over massive text corpora, with absolutely no exposure to visual, spatial, or geometric data. BERT provides our standard unimodal baseline, while RoBERTa represents a heavily optimized evolution of the same architecture. By comparing the alignment behavior of these pure language models against CLIP, we can accurately quantify how much of the cross-modal translation success relies on the text encoder already "knowing" what the physical world looks like.
 \section{Evaluation Metrics}
 \label{sec:metrics}
+
+Quantifying the success of cross-modal alignment requires robust metrics that capture both strict one-to-one correspondences and broader semantic retrieval capabilities. To ensure our evaluation remains strictly comparable with the supervised linear baseline, we assess the aligned representations using two primary criteria applied to our held-out query set of $500$ pairs.
+
+\subsection{Matching Accuracy}
+\label{subsec:matching_acc}
+
+Matching accuracy is the most stringent metric we employ. We frame the evaluation as a bipartite matching problem: given a completely shuffled set of 500 query point clouds and their 500 corresponding text embeddings, the algorithm must reconstruct the exact original pairs. 
+
+To achieve this, we first compute a dense pairwise distance matrix between all projected 3D and text features. We then apply the Hungarian algorithm (Linear Sum Assignment) to find the global permutation that minimizes the total cost across the entire batch. The matching accuracy is simply reported as the percentage of correctly recovered pairs. While mathematically elegant, this metric is exceptionally harsh. In a dataset as diverse as Objaverse, two distinct objects might share very similar geometries or semantic descriptions, meaning the algorithm is heavily penalized for confusing a generic "wooden chair" with another highly similar "wooden chair" in the batch.
+
+\subsection{Top-K Retrieval Accuracy}
+\label{subsec:topk_acc}
+
+Because exact matching can be overly rigid for multimodal tasks, Top-$K$ retrieval serves as our primary indicator of practical alignment quality. Instead of forcing a global 1-to-1 assignment, retrieval tests the local neighborhood of each embedding. 
+
+For a given 3D query shape, we rank all 500 text embeddings based on their cosine distance (or Euclidean distance, depending on the space topology) from the query point. If the ground-truth text caption falls within the top $K$ nearest neighbors, the retrieval is considered successful. We report results for $K \in \{1, 5, 10\}$. 
+
+This metric is particularly insightful for analyzing latent spaces. A high Top-5 or Top-10 score, even with a low Top-1 score, suggests that the underlying geometry of the modalities is successfully clustering similar concepts together, even if the absolute nearest neighbor is slightly noisy. As we move into the Optimal Transport framework in the next chapters, these retrieval metrics will clearly expose whether Gromov-Wasserstein distances succeed at preserving these semantic neighborhoods or if they completely collapse the space.
