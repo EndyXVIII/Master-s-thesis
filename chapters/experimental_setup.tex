@@ -45,20 +45,64 @@ To thoroughly investigate how different neural architectures shape their resulti
 \subsection{3D Encoders: PointNet and SparseConv}
 \label{subsec:3d_encoders}
 
-Processing 3D geometries introduces unique challenges, primarily because raw point clouds lack a regular grid structure and are strictly permutation invariant. To handle our standardized $2{,}048$-point samples, we deployed two fundamentally different geometric backbones.
+Processing 3D geometries introduces unique challenges, primarily because raw
+point clouds lack a regular grid structure and are strictly permutation
+invariant. To handle our standardised $2{,}048$-point samples, we deployed
+two fundamentally different geometric backbones.
 
-We relied on PointNet as our primary pre-trained extractor. PointNet directly consumes the raw $(x, y, z)$ coordinates, passing them through shared Multi-Layer Perceptrons (MLPs) and eventually using a symmetric max-pooling function to aggregate global shape features. This process yields a robust $1024$-dimensional feature vector. Its straightforward, global approach makes it an excellent baseline for latent space analysis, as the resulting geometry is not overly distorted by hierarchical inductive biases.
+We relied on PointNet as our primary pre-trained extractor. PointNet directly
+consumes the raw $(x, y, z)$ coordinates, passing them through shared
+Multi-Layer Perceptrons (MLPs) and eventually using a symmetric max-pooling
+function to aggregate global shape features. This process yields a robust
+$1024$-dimensional feature vector. Its straightforward, global approach makes
+it an excellent baseline for latent space analysis, as the resulting geometry
+is not overly distorted by hierarchical inductive biases.
 
-To contrast this, we also integrated a Sparse Convolutional Network (SparseConv). Unlike PointNet’s global pooling, SparseConv discretizes the 3D space into a sparse voxel grid and applies convolutions exclusively to occupied regions, which is theoretically much better at capturing fine-grained local geometries. We configured this backbone to output $512$-dimensional embeddings. Notably, as we will discuss in the baseline evaluations, we deliberately utilized SparseConv without pre-training (random weight initialization). This specific experimental choice allows us to isolate and observe the raw alignment capabilities of the spatial architecture itself, entirely separated from learned feature representations.
+To contrast this, we also integrated a Sparse Convolutional Network
+(SparseConv). Unlike PointNet's global pooling, SparseConv discretises the
+3D space into a sparse voxel grid and applies convolutions exclusively to
+occupied regions, which is theoretically much better at capturing fine-grained
+local geometries. We configured this backbone to output $512$-dimensional
+embeddings. Notably, as we will discuss in the baseline evaluations, we
+deliberately utilised SparseConv without pre-training (random weight
+initialisation).\footnote{Pre-trained SparseConv weights were requested from
+the original authors of \textcite{hadgi2025escaping} but were not available
+at the time of writing. The random-weight configuration therefore represents
+a lower bound on SparseConv performance, and results are expected to improve
+substantially once pre-trained weights become available.} This specific
+experimental choice allows us to isolate and observe the raw alignment
+capabilities of the spatial architecture itself, entirely separated from
+learned feature representations.
 
 \subsection{Text Encoders: CLIP, RoBERTa, and BERT}
 \label{subsec:text_encoders}
 
-For the textual modality, the central research question is whether purely linguistic representations can be mapped to 3D geometries via optimal transport, or if explicit visual pre-training is a strict prerequisite for cross-modal alignment. To cover this spectrum, we extracted features using three distinct transformer-based models.
+For the textual modality, the central research question is whether purely
+linguistic representations can be mapped to 3D geometries via optimal
+transport, or if explicit visual pre-training is a strict prerequisite for
+cross-modal alignment. To cover this spectrum, we extracted features using
+three distinct transformer-based models.
 
-Our strongest text backbone is the encoder derived from OpenCLIP (specifically the ViT-bigG-14 variant). Because CLIP is contrastively trained on massive image-text pairs, its latent space inherently encodes physical and visual semantics. We hypothesize that this underlying "visual grounding" makes its text embeddings significantly more compatible with 3D structural spaces.
+Our strongest text backbone is the encoder derived from OpenCLIP
+(specifically the \texttt{ViT-bigG-14} variant). Because CLIP is
+contrastively trained on massive image-text pairs, its latent space
+inherently encodes physical and visual semantics. We hypothesise that this
+underlying ``visual grounding'' makes its text embeddings significantly more
+compatible with 3D structural spaces.
 
-To evaluate purely linguistic spaces, we extracted text embeddings using BERT and RoBERTa. These models were trained strictly on masked language modeling objectives over massive text corpora, with absolutely no exposure to visual, spatial, or geometric data. BERT provides our standard unimodal baseline, while RoBERTa represents a heavily optimized evolution of the same architecture. By comparing the alignment behavior of these pure language models against CLIP, we can accurately quantify how much of the cross-modal translation success relies on the text encoder already "knowing" what the physical world looks like.
+To evaluate purely linguistic spaces, we extracted text embeddings using BERT
+and RoBERTa. These models were trained strictly on masked language modelling
+objectives over massive text corpora, with absolutely no exposure to visual,
+spatial, or geometric data. BERT provides our standard uni-modal baseline,
+while RoBERTa represents a heavily optimised evolution of the same
+architecture. By comparing the alignment behaviour of these pure language
+models against CLIP, we can accurately quantify how much of the cross-modal
+translation success relies on the text encoder already ``knowing'' what the
+physical world looks like --- a hypothesis that is directly validated by the
+results presented in Chapter~\ref{ch:baseline}, where CLIP-paired encoders
+consistently and substantially outperform purely linguistic alternatives
+across all evaluation metrics.
+
 \section{Evaluation Metrics}
 \label{sec:metrics}
 

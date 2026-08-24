@@ -65,17 +65,41 @@ Developed by \textcite{devlin2019bert}, BERT pre-trains bidirectional representa
 \subsection{Multimodal Vision-Language Models: OpenCLIP}
 \label{subsec:clip_encoders}
 
-While pure language models structure text based solely on linguistic and syntactic co-occurrence, vision-language models structure text representations to explicitly align with visual semantics.
+While pure language models structure text based solely on linguistic and
+syntactic co-occurrence, vision-language models structure text representations
+to explicitly align with visual semantics.
 
-\paragraph{CLIP and OpenCLIP.} 
-Contrastive Language-Image Pre-training (CLIP), introduced by \textcite{radford2021learning} and open-sourced via OpenCLIP \cite{cherti2023reproducible}, jointly trains a visual encoder and a text encoder using a symmetric contrastive loss (InfoNCE) on hundreds of millions of image-caption pairs. Given a batch of $B$ paired images $\mathbf{I}$ and texts $\mathbf{T}$, normalized feature embeddings $\mathbf{v}_i$ and $\mathbf{t}_j$ are computed. The contrastive objective optimizes cosine similarities:
+\paragraph{CLIP and OpenCLIP.}
+Contrastive Language-Image Pre-training (CLIP), introduced by
+\textcite{radford2021learning} and open-sourced via OpenCLIP
+\cite{cherti2023reproducible}, jointly trains a visual encoder and a text
+encoder using a symmetric contrastive loss (InfoNCE) on hundreds of millions
+of image-caption pairs. Given a batch of $B$ paired images $\mathbf{I}$ and
+texts $\mathbf{T}$, normalized feature embeddings $\mathbf{v}_i$ and
+$\mathbf{t}_j$ are computed. The contrastive objective optimizes cosine
+similarities:
 \begin{equation}
-    \mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{2B} \sum_{i=1}^B \left( \log \frac{\exp(\mathbf{v}_i^T \mathbf{t}_i / \tau)}{\sum_{j=1}^B \exp(\mathbf{v}_i^T \mathbf{t}_j / \tau)} + \log \frac{\exp(\mathbf{t}_i^T \mathbf{v}_i / \tau)}{\sum_{j=1}^B \exp(\mathbf{t}_i^T \mathbf{v}_j / \tau)} \right)
+\mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{2B} \sum_{i=1}^B \left(
+    \log \frac{\exp(\mathbf{v}_i^T \mathbf{t}_i / \tau)}
+              {\sum_{j=1}^B \exp(\mathbf{v}_i^T \mathbf{t}_j / \tau)}
+    + \log \frac{\exp(\mathbf{t}_i^T \mathbf{v}_i / \tau)}
+                {\sum_{j=1}^B \exp(\mathbf{t}_i^T \mathbf{v}_j / \tau)}
+\right)
 \end{equation}
 where $\tau$ is a learnable temperature parameter.
 
-Because OpenCLIP text embeddings are explicitly pre-aligned with 2D visual structures, they provide a spatially aware latent space that serves as an ideal reference target for 3D geometric shape alignment. For this thesis, we utilize the massive \texttt{ViT-bigG-14} OpenCLIP architecture, pre-trained on the \texttt{laion2b\_s39b\_b160k} dataset, which yields high-capacity $1280$-dimensional global text features.
-\section{Cross-Modal Alignment}
+Because OpenCLIP text embeddings are explicitly pre-aligned with 2D visual
+structures, they provide a spatially aware latent space that serves as an
+ideal reference target for 3D geometric shape alignment. For this thesis, we
+utilise the massive \texttt{ViT-bigG-14} OpenCLIP architecture, pre-trained
+on the \texttt{laion2b\_s39b\_b160k} dataset, which yields high-capacity
+$1280$-dimensional global text features. Importantly, we exclusively employ
+the \textbf{text encoder} component of OpenCLIP --- the visual encoder is
+not used at any stage of our pipeline. This design choice allows us to
+leverage the visual grounding implicitly encoded in CLIP's text
+representations, without introducing any 2D image features into the
+cross-modal alignment evaluation.
+x\section{Cross-Modal Alignment}
 \label{sec:cross_modal}
 
 Once high-dimensional latent representations are extracted from independent 3D and text encoders, the fundamental challenge is to bridge the semantic gap between these mathematically distinct spaces. Cross-modal alignment paradigms are broadly categorized into supervised methods, which rely on explicitly paired anchor samples to learn a mapping, and unsupervised methods, which attempt to align spaces purely through intrinsic topological structures.

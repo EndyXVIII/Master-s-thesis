@@ -1,11 +1,43 @@
 \chapter{Conclusions}
 \label{ch:conclusions}
 
+This thesis investigated the topological relationships between 3D geometric structures and natural language representations, driven by the ambition to achieve zero-shot cross-modal retrieval. By attempting to bypass the severe scalability limits of heavily supervised datasets, we exhaustively tested whether these heterogeneous modalities naturally share a universal geometry that can be aligned using Optimal Transport. Rather than culminating in a standard algorithmic success story, this research provides a rigorous diagnostic profiling of multimodal latent spaces, establishing strict boundary conditions for future representation learning.
+
 \section{Summary of Results}
 \label{sec:summary}
+
+The empirical findings of this study establish a stark dichotomy between supervised optimization and unsupervised structural alignment. The state-of-the-art linear baseline, utilizing Canonical Correlation Analysis (CCA) and an affine transformation, successfully bridged the modal gap, achieving a Top-5 retrieval accuracy of $35.7\%$ on the PointNet and CLIP pair. %[cite: 1] 
+To expand upon this, we introduced Riemannian Metric Learning (RML) as an original non-linear contribution, which proved highly effective by reaching $27.2\%$ Top-5 accuracy. %[cite: 1] 
+Both methods fundamentally rely on the explicit supervision of $30{,}000$ ground-truth anchor pairs to force the alignment. %[cite: 1] 
+
+Conversely, attempting to align these spaces without paired labels utilizing the Gromov-Wasserstein ($\mathcal{GW}$) framework resulted in a catastrophic collapse. Across five distinct OT variants—including Sliced GW, Rotation-Invariant SGW, and Low-Rank GW—unsupervised performance hovered marginally above random chance, peaking at just $1.5\%$ Top-5 accuracy for pure structural matching. %[cite: 1] 
+Through an exhaustive thirteen-test ablation study, we systematically ruled out implementation bugs, hyperparameter instability, and library artifacts. %[cite: 1] 
+The results definitively proved that the failure is rooted in a fundamental violation of the OT mathematical assumptions: neural networks trained independently on completely different sensory inputs do not naturally converge to structurally isometric manifolds. Minimizing the structural discrepancy between these non-isometric spaces mathematically scrambles their semantic identities, rendering zero-shot geometric alignment impossible in this context. %[cite: 1] 
 
 \section{Limitations}
 \label{sec:limitations}
 
+While the diagnostic conclusions are definitive for the tested spaces, several limitations define the scope of this work. 
+
+First, the computational complexity of the standard Gromov-Wasserstein problem, which scales at $\mathcal{O}(n^3)$, prohibited the calculation of exact dense transport plans at the full scale of the dataset. %[cite: 1] 
+Consequently, the optimization relied heavily on low-rank approximations and 1-dimensional sliced projections. %[cite: 1] 
+Although our fine-grained epsilon sweeps proved that this did not mask a viable global minimum, these relaxations inherently smooth the transport matrix, potentially obscuring highly localized topological structures. %[cite: 1] 
+
+Second, the textual representations are bounded by the specific linguistic distribution of the Cap3D captioning framework. Because Objaverse lacks native human-annotated text, the language models are aligning to synthetic, highly descriptive captions that may lack the semantic variability and nuance of natural human phrasing. 
+
+Finally, our evaluations were confined to pre-trained, frozen feature extractors. While architectures like CLIP provide massive generalized visual grounding, they were not natively exposed to 3D voxel or point-cloud spatial logic during their foundational training phases.
+
 \section{Future Work}
 \label{sec:future_work}
+
+The theoretical bottleneck exposed by this thesis provides clear signposts for future multimodal research. Attempting post-hoc, zero-shot geometric alignment on independently trained, unaligned spaces is highly likely to remain a theoretical dead end. Future efforts should pivot toward the following paradigms:
+
+\begin{itemize}
+    \item \textbf{Joint Contrastive Pre-training:} Rather than attempting to align disparate spaces after they have been frozen, architectures should be trained concurrently using contrastive objectives. By penalizing non-isometric topologies directly within the loss function during the initial training phase, the resulting latent spaces would be inherently co-located, rendering complex post-hoc optimal transport unnecessary.
+    
+    \item \textbf{Relaxed Topological Constraints:} If post-hoc alignment is strictly required, future OT solvers must abandon the global isometry assumption. Research could explore highly localized, partial transport mechanisms or heavily regularized variants of Fused Gromov-Wasserstein that incorporate weak heuristic priors—such as basic categorical clustering—to softly guide the transport plan without requiring tens of thousands of exact instance-level pairings.
+    
+    \item \textbf{LLMs as Explicit Spatial Bridges:} Instead of mapping raw geometry directly to continuous text embeddings, intermediate discrete representations could be utilized. Modern Large Language Models could be prompted to generate highly structured, procedural descriptions of 3D objects (e.g., scene graphs or bounding box relationships). Aligning 3D geometry to this explicit spatial logic might exhibit a significantly higher degree of structural isomorphism than aligning it to standard descriptive captions.
+\end{itemize}
+
+In closing, while the absolute structural alignment of 3D and textual modalities via optimal transport remains elusive, mapping the precise theoretical boundaries of this failure has provided invaluable insights into the topological behavior of neural representations, paving the way for more robust, geometrically aware multimodal architectures.

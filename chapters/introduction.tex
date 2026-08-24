@@ -27,7 +27,7 @@ Although significant progress has been made in post-hoc multimodal alignment in 
 
 \item \textbf{The Curse of Paired Supervision:} The basic framework laid out in \textcite{hadgi2025escaping} illustrates that by using supervised linear projections such as canonical correlation analysis (CCA) followed by an affine transformation, one can extract shared structures between 3D and text representations. However, the method used by the authors of the above paper requires thousands of explicitly paired anchors, which brings forth a crucial research question: How much of the semantic alignment found is an intrinsic property of the independently learned latent spaces and how much is an artificial outcome enforced by supervision?
 
-\item \textbf{The Effectiveness of Relational Unsupervised Alignment:} Optimal transport (OT) in its Gromov-Wasserstein (GW) formulation theoretically provides a framework to align two metric spaces using only their intra-domain relation structure and without any pair-wise supervision. Although GW approaches have been successful in the domain of graph matching and 2D vision-language alignment, their performance on high-dimensional and complex 3D-text latent spaces have not yet been studied and is left as an open research question.
+\item \textbf{The Effectiveness of Relational Unsupervised Alignment:} Optimal transport (OT) in its Gromov-Wasserstein (GW) formulation theoretically provides a framework to align two metric spaces using only their intra-domain relation structure and without any pair-wise supervision. Although GW approaches have been successful in the domain of graph matching and 2D vision-language alignment, their performance on high-dimensional and complex 3D-text latent spaces has not yet been studied and is left as an open research question.
 
 \end{enumerate}
 
@@ -61,7 +61,7 @@ To provide satisfactory answers to the above research questions, this thesis out
 
 \item \textbf{Develop and Deploy Unsupervised OT Algorithms:} We implement and evaluate five different Gromov-Wasserstein variants (Sliced GW, Rotation-Invariant SGW, Semi-Supervised RISGW, Fused GW and Low-Rank GW) combined with scale-matching normalizations from \textcite{li2026scale}.
 
-\item \textbf{Conduct Exhaustive Ablation Studies:} We systematically investigate hyperparameter ranges and feature space effects (e.g. With and without projections, and impact of subspace dimensions and regularization terms) across our developed pipeline to isolate potential computational and performance bottlenecks.
+\item \textbf{Conduct Exhaustive Ablation Studies:} We systematically investigate hyperparameter ranges and feature space effects (e.g. with and without projections, and impact of subspace dimensions and regularization terms) across our developed pipeline to isolate potential computational and performance bottlenecks.
 
 \item \textbf{Prove Theoretical Bounds:} We provide theoretical justifications for successful and failed unsupervised alignment through an in-depth analysis of domain-specific metric distribution properties, CKA similarity of the structural information contained within features and transport plan entropies.
 
@@ -84,8 +84,15 @@ The main contributions of this work are summarised as follows:
 
 \item \textbf{Faithful Replication and Benchmarking of Supervised Linear Alignment:} We deploy an end-to-end feature extraction and alignment pipeline on $46{,}675$ paired 3D objects from the Objaverse dataset with Cap3D captions. We faithfully replicate the SVD-based Canonical Correlation Analysis (CCA) and affine alignment baseline proposed by \textcite{hadgi2025escaping} across six different encoder combinations (PointNet and SparseConv paired with OpenCLIP, RoBERTa, and BERT), establishing a robust evaluation benchmark ($35.7\%$ Top-5 retrieval for PointNet $\times$ OpenCLIP).
     \item \textbf{Exhaustive Evaluation of Optimal Transport Frameworks:} We implement and benchmark five distinct Gromov-Wasserstein (GW) Optimal Transport variants---Sliced GW (SGW), Rotation-Invariant SGW (RISGW), Semi-Supervised RISGW (SS-RISGW), Fused GW (FGW), and Low-Rank GW (LR-GW via OTT-JAX)---incorporating the scale-matching normalization proposed by \textcite{li2026scale}. Through an exhaustive grid search and thirteen independent ablation experiments, we systematically prove that unsupervised GW methods fail ($\le 4.4\%$ Top-5) to align 3D and text latent spaces.
-    \item \textbf{Exploration of Non-Linear Supervised Alignment Extensions:} As an original contribution beyond linear maps, we implement and evaluate two supervised non-linear alignment frameworks: Kernel CCA (KCCA) with Nystrm kernel matrix approximation and Riemannian Metric Learning (RML) on the Stiefel manifold, offering a flexible distance metric learning alternative.
-    \item \textbf{Theoretical Proof of Structural Non-Isometry:} By analyzing transport plan entropy, mass concentration ratios, self-GW cost ratios, and unaligned CKA structural similarity scores (as reported by \textcite{hadgi2025escaping} in their Figure 2, $\approx 0.12$), we provide a theoretical proof explaining why unsupervised relational optimal transport fails. We demonstrate that uni-modal 3D point cloud latent spaces and text spaces fundamentally violate the assumption of \emph{structural isometry}, trapping quadratic optimal transport solvers in non-informative local minima.
+\item \textbf{Exploration of Non-Linear Supervised Alignment Extensions:}
+As an original contribution beyond linear maps, we implement and evaluate
+two supervised non-linear alignment frameworks: Kernel CCA (KCCA) with
+Nystr\"{o}m kernel matrix approximation, which extends linear CCA to
+non-linear mappings via an RBF kernel; and Riemannian Metric Learning
+(RML), which learns a Mahalanobis distance metric via gradient descent
+on the Cholesky factor of a symmetric positive definite matrix, offering
+a flexible non-linear alternative to direct feature-space mapping.
+\item \textbf{Theoretical Proof of Structural Non-Isometry:} By analyzing transport plan entropy, mass concentration ratios, self-GW cost ratios, and unaligned CKA structural similarity scores (as reported by \textcite{hadgi2025escaping} in their Figure 2, $\approx 0.12$), we provide a theoretical proof explaining why unsupervised relational optimal transport fails. We demonstrate that uni-modal 3D point cloud latent spaces and text spaces fundamentally violate the assumption of \emph{structural isometry}, trapping quadratic optimal transport solvers in non-informative local minima.
 
 \end{itemize}
 
@@ -96,13 +103,35 @@ The main contributions of this work are summarised as follows:
 The remainder of this thesis is organised as follows:
 
 \begin{itemize}
-    \item \textbf{Chapter \ref{ch:background} (Background and Related Work):} Reviews the core theoretical foundations of 3D representation learning, multimodal vision-language models, Canonical Correlation Analysis, and Optimal Transport theory (including Monge-Kantorovich formulations, Wasserstein metrics, and Gromov-Wasserstein relational alignment).
-    
-    \item \textbf{Chapter \ref{ch:experimental_setup} (Experimental Setup):} Outlines the experimental methodology, dataset preparation (Objaverse and Cap3D), backbone encoder architectures, high-performance computing cluster setup, and cross-modal retrieval evaluation metrics.
-    
-    \item \textbf{Chapter \ref{ch:baseline} (Supervised Linear Baseline and Extensions):} Details the implementation, replication, and performance of supervised linear alignment (CCA and Affine transformations) alongside non-linear extensions including Kernel CCA and Riemannian Metric Learning.
-    
-    \item \textbf{Chapter \ref{ch:gw_alignment} (Gromov-Wasserstein Alignment and Theoretical Analysis):} Investigates unsupervised relational Optimal Transport formulations, presents empirical ablation studies across GW variants, and provides a theoretical non-isometry analysis explaining the limits of relational OT.
-    
-    \item \textbf{Chapter \ref{ch:conclusions} (Conclusion and Future Work):} Summarizes the primary findings of the thesis, discusses the broader implications for 3D multimodal alignment, and outlines promising directions for future research.
+    \item \textbf{Chapter \ref{ch:background} (Background and Related Work):}
+    Reviews the core theoretical foundations of 3D representation learning,
+    multimodal vision-language models, Canonical Correlation Analysis, and
+    Optimal Transport theory (including Monge-Kantorovich formulations,
+    Wasserstein metrics, and Gromov-Wasserstein relational alignment).
+
+    \item \textbf{Chapter \ref{ch:experimental_setup} (Experimental Setup):}
+    Outlines the experimental methodology, dataset preparation (Objaverse and
+    Cap3D), backbone encoder architectures, high-performance computing cluster
+    setup, and cross-modal retrieval evaluation metrics.
+
+    \item \textbf{Chapter \ref{ch:baseline} (Supervised Linear Baseline):}
+    Details the implementation, replication, and performance of the supervised
+    linear alignment pipeline (CCA and Affine transformations) across all six
+    encoder combinations.
+
+    \item \textbf{Chapter \ref{ch:nonlinear} (Non-Linear Alignment Methods):}
+    Presents two supervised non-linear extensions as original contributions:
+    Kernel CCA with Nystr\"{o}m approximation and Riemannian Metric Learning,
+    evaluated at full dataset scale and compared against the linear baseline.
+
+    \item \textbf{Chapter \ref{ch:gw_alignment} (Gromov-Wasserstein Alignment
+    and Theoretical Analysis):} Investigates unsupervised relational Optimal
+    Transport formulations, presents thirteen diagnostic ablation experiments
+    across GW variants, and provides a theoretical non-isometry analysis
+    explaining the fundamental limits of relational OT.
+
+    \item \textbf{Chapter \ref{ch:conclusions} (Conclusion and Future Work):}
+    Summarises the primary findings of the thesis, discusses the broader
+    implications for 3D multimodal alignment, and outlines promising directions
+    for future research.
 \end{itemize}

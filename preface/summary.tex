@@ -9,14 +9,55 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.8em}
 
-Over the past several years, multimodal artificial intelligence has seen a substantial rise in its success in mapping vision and text to shared latent spaces. Nevertheless, extending these alignment frameworks to three-dimensional (3D) geometric representations has remained a considerable open problem given the inherent topological dissimilarity and non-Euclidean properties of 3D point clouds when compared to language structures.
+Over the past several years, multimodal artificial intelligence has seen a
+substantial rise in its success in mapping vision and text to shared latent
+spaces. Nevertheless, extending these alignment frameworks to
+three-dimensional (3D) geometric representations has remained a considerable
+open problem given the inherent topological dissimilarity and non-Euclidean
+properties of 3D point clouds when compared to language structures.
 
-This Master's thesis provides a thorough empirical and theoretical investigation into cross-modal latent alignment between uni-modal 3D objects and text latent spaces. We train a system on a large scale dataset of 3D objects and their corresponding textual descriptions, extracts features across several multi-modal backbones such as PointNet, OpenCLIP, RoBERTa, and BERT to characterize modalities into high dimensional global embedding.
+This Master's thesis provides a thorough empirical and theoretical
+investigation into cross-modal latent alignment between uni-modal 3D objects
+and text latent spaces. We extract features from a large-scale dataset of
+3D objects and their corresponding textual descriptions using several
+pre-trained encoder backbones --- PointNet, OpenCLIP, RoBERTa, and BERT ---
+characterising each modality as a high-dimensional global embedding.
 
-Firstly, we conduct a strict replication and verification of the state-of-the-art supervised linear alignment framework \textcite{hadgi2025escaping}. An in-depth series of anchor pairs are projected to a common low dimensional shared space through an exact SVD-based Canonical Correlation Analysis (CCA), and subsequently an affine least-squares solution to derive a robust benchmark for this problem. Tested on a hold-out query set, averaged over multiple random initializations, our replication of this system confirms that supervised linear transformations effectively expose shared geometric underlying structures between the modalities.
+Firstly, we conduct a strict replication and verification of the
+state-of-the-art supervised linear alignment framework of
+\textcite{hadgi2025escaping}. A set of anchor pairs is projected into a
+common low-dimensional shared space through an exact SVD-based Canonical
+Correlation Analysis (CCA), followed by an affine least-squares mapping to
+derive a robust benchmark. Tested on a held-out query set and averaged over
+multiple random seeds, our replication confirms that supervised linear
+transformations effectively expose shared geometric structures between the
+modalities, achieving $35.7\%$ Top-5 retrieval accuracy on the PointNet
+$\times$ CLIP pair.
 
-Secondly, we extensively explore unsupervised and weakly-supervised Optimal Transport (OT) based alignment frameworks including the use of Gromov-Wasserstein (GW) distance metrics \cite{vayer2019optimal}. We analyze the performance of various GW variants such as Sliced GW, Rotation-Invariant SGW, Semi-Supervised RISGW, Fused GW and Low-Rank GW, integrating with recent improvements on intra-domain scale-matching normalization presented by \textcite{li2026scale}. Our results in extensive independent ablation studies demonstrate that all unsupervised GW approaches underperformed consistently at aligning latent spaces with random retrieval rates on all metrics.
+Secondly, we extensively explore unsupervised and weakly-supervised Optimal
+Transport (OT) based alignment frameworks, including the use of
+Gromov-Wasserstein (GW) distance metrics \cite{vayer2019optimal}. We analyse
+the performance of five GW variants --- Sliced GW, Rotation-Invariant SGW,
+Semi-Supervised RISGW, Fused GW, and Low-Rank GW --- integrating the
+intra-domain scale-matching normalisation of \textcite{li2026scale}. Through
+thirteen independent ablation experiments, we demonstrate that all
+unsupervised GW approaches fail consistently, achieving retrieval rates
+indistinguishable from random guessing across all metrics. As an original
+contribution, we also implement and evaluate two supervised non-linear
+extensions: Kernel CCA with Nystr\"{o}m approximation (15.8\% Top-5) and
+Riemannian Metric Learning (27.2\% Top-5), the latter reaching 76\% of the
+supervised linear baseline performance.
 
-Thirdly, we explain these failed alignment outcomes using a theoretical and structural analysis approach. Through the examination of transport plan entropy, mass concentration ratio, and self-structural cost evaluation metrics, we prove that 3D geometric point cloud spaces and text latent spaces fundamentally violate the inherent assumption of structural isometry. Because intra-domain distributions lack any form ofisometric correlation, the quadratic solvers for unsupervised optimal transport are stuck at non-informative and uniform local minima, demonstrating that explicitly based on anchor supervision is critical for successful cross-modal 3D-text alignment, and marking the mathematical limitations of relational optimal transport in multimodal learning.
+Thirdly, we explain these failed alignment outcomes through a theoretical and
+structural analysis. Through the examination of transport plan entropy, mass
+concentration ratios, and self-structural GW cost ratios, we prove that 3D
+geometric point cloud spaces and text latent spaces fundamentally violate the
+assumption of structural isometry. Because the intra-domain distributions
+lack isometric correlation, the quadratic solvers for unsupervised optimal
+transport converge to non-informative, near-uniform local minima,
+demonstrating that explicit anchor supervision is critical for successful
+cross-modal 3D-text alignment and marking the mathematical limitations of
+relational optimal transport in multimodal learning.
+
 \endgroup
 \vfill

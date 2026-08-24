@@ -1,0 +1,203 @@
+\chapter{Non-Linear Supervised Alignment Methods}
+\label{ch:nonlinear}
+
+While the CCA + Affine baseline of Chapter~\ref{ch:baseline} establishes a
+strong supervised linear upper bound, it is inherently constrained to learning
+affine transformations between the two modalities. This chapter investigates
+two non-linear extensions that operate within the same supervised paradigm
+--- leveraging the same 30,000 ground-truth anchor pairs --- but exploit
+more expressive, non-linear geometric structures to potentially close the
+remaining performance gap.
+
+Both methods are evaluated under identical experimental conditions to those
+of Chapter~\ref{ch:baseline}: $n_A = 30{,}000$ anchor pairs, $k = 50$ CCA
+subspace, 500 held-out query pairs, averaged over three independent random seeds.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Kernel CCA with Nyström Approximation}
+\label{sec:kcca}
+
+\subsection{Motivation}
+\label{subsec:kcca_motivation}
+
+Standard CCA discovers only linear correlations between two spaces. However,
+the relationship between 3D geometric representations and natural language
+embeddings may contain non-linear structure that a linear projection cannot
+capture. Kernel CCA (KCCA) extends CCA by implicitly mapping features into
+a higher-dimensional Reproducing Kernel Hilbert Space (RKHS) via a kernel
+function, allowing the discovery of non-linear correlations without explicitly
+computing the high-dimensional feature map.
+
+\subsection{Implementation}
+\label{subsec:kcca_implementation}
+
+KCCA replaces the dot product in the standard covariance computation with
+a kernel evaluation:
+\begin{equation}
+    K(x, x') = \exp\!\left(-\gamma \|x - x'\|^2\right)
+    \label{eq:rbf_kernel}
+\end{equation}
+where $\gamma = 0.1$ is the RBF bandwidth parameter. The resulting kernel
+matrix $K \in \mathbb{R}^{n \times n}$ captures non-linear similarity
+between samples in the original feature space.
+
+Computing KCCA exactly requires inverting an $n \times n$ matrix, which
+scales as $\mathcal{O}(n^3)$ --- computationally infeasible at $n = 30{,}000$
+anchors. To address this, we employ the \textbf{Nyström approximation}
+\cite{williams2001nystrom}, which approximates the full kernel matrix using
+a randomly selected subset of $m = 500$ landmark points:
+\begin{equation}
+    K \approx K_{nm}\, K_{mm}^{-1}\, K_{mn}
+    \label{eq:nystrom}
+\end{equation}
+where $K_{nm} \in \mathbb{R}^{n \times m}$ contains kernel evaluations between
+all $n$ training points and the $m$ landmarks, and $K_{mm} \in \mathbb{R}^{m
+\times m}$ is the kernel matrix restricted to the landmarks. This reduces the
+computational cost to $\mathcal{O}(m^2 n)$, making KCCA tractable at full
+dataset scale.
+
+\subsection{Results}
+\label{subsec:kcca_results}
+
+\begin{table}[h]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Pair} & \textbf{CA Match} & \textbf{CA Top-5}
+    & \textbf{KCCA Match} & \textbf{KCCA Top-5}
+    & \textbf{RML Match} & \textbf{RML Top-5} \\
+\midrule
+PointNet $\times$ CLIP      & 13.5\% & 35.7\% & 4.7\% & 15.8\% & 9.4\%  & \textbf{27.2\%} \\
+PointNet $\times$ RoBERTa   &  8.9\% & 28.3\% & 3.1\% & 13.1\% & 4.6\%  & 17.3\% \\
+PointNet $\times$ BERT      &  7.2\% & 25.0\% & 3.1\% & 12.4\% & 5.1\%  & 16.5\% \\
+SparseConv $\times$ CLIP    &  3.6\% & 13.1\% & 1.2\% &  6.3\% & 3.7\%  & 10.7\% \\
+SparseConv $\times$ RoBERTa &  3.5\% & 13.3\% & 1.5\% &  6.1\% & 2.5\%  &  9.7\% \\
+SparseConv $\times$ BERT    &  2.0\% & 10.2\% & 1.4\% &  5.4\% & 2.7\%  &  8.3\% \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Non-linear methods compared to CCA+Affine (CA) across all encoder
+pairs. KCCA: Kernel CCA with Nyström approximation ($\gamma$=0.1, $m$=500
+landmarks). RML: Riemannian Metric Learning (batch=256, lr=0.01, 200
+iterations). RML reaches 27.2\% Top-5 on PointNet$\times$CLIP, the closest
+alternative to CCA+Affine at 76\% of its performance.
+CA results are taken from Table~\ref{tab:baseline_results} (Chapter~\ref{ch:baseline})
+and reported here for direct comparison. Protocol: 30,000 anchor pairs,
+500 query points, $k=50$, averaged over 3 random seeds.}
+\label{tab:nonlinear_results}
+\end{table}
+
+Kernel CCA with Nyström approximation achieves 15.8\% Top-5 on
+PointNet$\times$CLIP, an improvement over all unsupervised GW methods but
+considerably below the linear CCA+Affine baseline. The gap suggests that
+the non-linear structure captured by the RBF kernel does not provide
+substantially more discriminative projections than the linear CCA in this
+setting. A possible explanation is that the Nyström approximation with
+$m=500$ landmarks undersamples the structural diversity of the 30,000-anchor
+distribution, limiting the expressiveness of the non-linear mapping.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Riemannian Metric Learning}
+\label{sec:rml}
+
+\subsection{Motivation}
+\label{subsec:rml_motivation}
+
+Rather than learning a mapping between the two spaces, Riemannian Metric
+Learning (RML) takes a different approach: it learns a \emph{distance metric}
+that makes paired anchor features as close as possible in a shared geometric
+space. This is conceptually distinct from CCA+Affine, which projects both
+spaces into a subspace and then learns a translation. RML instead deforms the
+measurement geometry of the feature space so that 3D-text paired samples
+are intrinsically nearby.
+
+\subsection{Implementation}
+\label{subsec:rml_implementation}
+
+RML learns a Mahalanobis distance matrix $M = L^\top L$ (symmetric positive
+definite, SPD) that minimises the pairwise distances between anchor pairs:
+\begin{equation}
+    \mathcal{L}(M) = \sum_{i=1}^{n_A} \|L(x_i - y_i)\|^2
+    \label{eq:rml_loss}
+\end{equation}
+where $x_i$ and $y_i$ are the CCA-projected 3D and text features of the
+$i$-th anchor pair, and $L$ is the Cholesky factor of $M$, ensuring positive
+definiteness throughout optimization.
+
+The matrix $L$ is optimized via stochastic gradient descent directly on the
+Cholesky factor, with batch size 256, learning rate 0.01, and 200 iterations.
+During retrieval, cosine similarity is replaced by the learned Mahalanobis
+distance:
+\begin{equation}
+    \text{sim}_M(x, y) = -\|L(x - y)\|^2
+    \label{eq:mahalanobis_sim}
+\end{equation}
+This formulation allows RML to learn an anisotropic geometry that weights
+different dimensions of the CCA subspace according to their discriminative
+power for cross-modal retrieval.
+
+\subsection{Results}
+\label{subsec:rml_results}
+
+RML achieves 27.2\% Top-5 on PointNet$\times$CLIP (Table~\ref{tab:nonlinear_results}),
+the strongest result among all non-linear alternatives and the closest to
+CCA+Affine (35.7\%) at 76\% of its performance. Across all encoder pairs,
+RML consistently outperforms KCCA by a substantial margin, suggesting that
+directly minimising anchor-pair distances in a learned metric space is a more
+effective strategy than discovering non-linear correlations via kernelisation.
+
+The performance gap between RML (27.2\%) and CCA+Affine (35.7\%) likely
+reflects the fundamental difference in how the two methods use supervision.
+The affine map learns a global linear transformation that minimises the
+reconstruction error across \emph{all} anchor pairs simultaneously, producing
+a coherent global alignment. RML, by contrast, minimises local pairwise
+distances, which may not generalise as effectively to unseen query pairs.
+
+%% ─────────────────────────────────────────────────────────────────────────────
+\section{Complete Method Ranking}
+\label{sec:nonlinear_ranking}
+
+Table~\ref{tab:complete_ranking} summarises all tested alignment methods on
+PointNet$\times$CLIP, enabling a direct comparison across the three paradigms
+explored in this thesis: unsupervised GW-based methods (Chapter~\ref{ch:gw_alignment}),
+the supervised linear baseline (Chapter~\ref{ch:baseline}), and the supervised
+non-linear extensions presented in this chapter.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llcccccc}
+\toprule
+\textbf{Method} & \textbf{Sup.} & \textbf{Anc.}
+    & \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
+\midrule
+\multicolumn{7}{l}{\textit{GW-based — unsupervised (Chapter~\ref{ch:gw_alignment})}} \\
+SGW (best: $k$=20) & $\times$ & 5k & 1.5\% & 1.1\% & 3.2\% & 4.8\% \\
+FGW ($\alpha$=0.2) & $\times$ & 1k & 3.6\% & 3.6\% & 4.4\% & 5.4\% \\
+\midrule
+\multicolumn{7}{l}{\textit{Linear supervised — paper method (Chapter~\ref{ch:baseline})}} \\
+CCA + Affine       & \checkmark & 30k & 13.5\% & 14.6\% & \textbf{35.7\%} & 46.4\% \\
+\midrule
+\multicolumn{7}{l}{\textit{Non-linear supervised — original contribution (this chapter)}} \\
+KCCA Nyström ($\gamma$=0.1) & \checkmark & 30k & 4.7\% & 4.9\% & 15.8\% & 23.3\% \\
+Riemannian Metric Learning  & \checkmark & 30k & 9.4\% & 8.7\% & 27.2\% & 38.4\% \\
+\bottomrule
+\end{tabular}
+\caption{Complete ranking of all tested alignment methods on PointNet
+$\times$ CLIP. Final Top-5 order: CCA+Affine (35.7\%) $>$ RML (27.2\%)
+$>$ KCCA (15.8\%) $>$ FGW (4.4\%) $>$ SGW (3.2\%) $\approx$ random
+($\approx$1.6\%). Supervised methods consistently and substantially
+outperform all unsupervised alternatives.
+CCA+Affine result taken from Table~\ref{tab:baseline_results}
+(Chapter~\ref{ch:baseline}). All other results: same protocol,
+30,000 anchor pairs, 500 query points, $k=50$, 3 seeds.}
+\label{tab:complete_ranking}
+\end{table}
+
+The results establish a clear hierarchy: supervised methods consistently
+and substantially outperform unsupervised ones, and within supervised methods,
+the simpler linear approach (CCA+Affine) outperforms the non-linear alternatives.
+This counter-intuitive finding underscores that the performance bottleneck
+in this setting is not the expressiveness of the alignment model, but rather
+the availability of explicit paired supervision and the intrinsic geometric
+compatibility of the latent spaces being aligned.
