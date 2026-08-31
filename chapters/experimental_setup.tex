@@ -8,7 +8,6 @@ To gauge the structural alignment between 3D object shapes and text descriptions
 
 \begin{figure}[htpb]
     \centering
-    % Inserisci l'immagine che hai scaricato nella cartella 'images/'
     \includegraphics[width=\linewidth]{objaverse.png}
     \caption{Sample objects from the Objaverse dataset alongside their textual annotations. This paired structure provides the foundational multimodal data required to supervise and evaluate 3D-text latent space alignment.}
     \label{fig:objaverse_sample}
@@ -17,25 +16,54 @@ To gauge the structural alignment between 3D object shapes and text descriptions
 \subsection{Feature Extraction Pipeline}
 \label{subsec:feature_pipeline}
 
-The experimental workflow was instantiated on the University of Padova’s high-performance computing (HPC) cluster, \texttt{labsrv7}. We distributed feature extraction as well as pair alignment across NVIDIA A100 (20GB MIG), Tesla V100 and Tesla T4 GPUs via use of the Slurm workload management system.
+The experimental workflow was instantiated on the University of Padova’s high-performance computing (HPC) cluster, \texttt{labsrv7}. We distributed feature extraction as well as pair alignment across NVIDIA A100 (20GB \gls{mig}), Tesla V100 and Tesla T4 GPUs via use of the Slurm workload management system.
 
 We begin by sampling $100{,}000$ 3D objects from the Objaverse dataset. Before extracting geometric features, each 3D mesh was standardized: we uniformly sampled $2{,}048$ surface points, then centered each sample by subtracting the point-cloud’s mean and normalized by taking the maximum value along its euclidean dimensions. The feature extraction pipeline efficiently processes objects in batches of $10{,}000$ objects and features an auto-resume mechanism in case a node failure or job interrupt occurs. After filtering out meshes containing an error and samples with insufficient or nonsensical associated text, we arrived at a set of $46{,}675$ paired samples that had a clean textual annotation for all items across every modality.
 
-% ---------------------------------------------------------
-% PLACEHOLDER PER IL TUO DIAGRAMMA DRAW.IO (Opzionale)
-% ---------------------------------------------------------
+\paragraph{Preprocessing Details.} Beyond the point-cloud standardisation described above, each modality underwent an additional normalisation step prior to any alignment method being fitted. All 3D and text feature vectors were $L_2$-normalised to unit norm immediately after extraction, ensuring that subsequent cosine-similarity-based retrieval metrics (Section~\ref{subsec:topk_acc}) are not confounded by differences in the absolute magnitude of embeddings produced by architecturally distinct encoders. For methods requiring zero-mean input --- specifically the raw-feature ablation of Test 12 in Chapter~\ref{ch:gw_alignment} --- a StandardScaler transformation (zero mean, unit variance per dimension, fitted on the anchor split only and applied unchanged to the query split) was additionally evaluated as an alternative to $L_2$-normalisation, to isolate whether the choice of normalisation scheme itself could account for observed performance differences. No outlier removal or clipping was applied to any feature vector, as the diagnostic purpose of this thesis requires that raw encoder outputs remain unmodified wherever possible.
+
 \begin{figure}[htpb]
-    \centering
-    % \includegraphics[width=\linewidth]{images/extraction_pipeline.png}
-    \framebox(\textwidth, 150){[Image Placeholder: extraction\_pipeline.png]}
-    \caption{Overview of the end-to-end feature extraction pipeline. 3D meshes are standardized into 2048-point clouds before being processed by the 3D encoders, while text captions are independently embedded by language models.}
-    \label{fig:extraction_pipeline}
+  \centering
+  \includegraphics[width=1\textwidth]{fig_pipeline}
+  \caption{Overview of the end-to-end feature extraction and alignment
+  pipeline. Raw 3D objects and text captions are independently encoded
+  by frozen uni-modal backbones into high-dimensional feature matrices.
+  \gls{cca}, fitted on $n_A = 30{,}000$ anchor pairs, projects both
+  modalities into a shared $k = 50$ dimensional subspace. The resulting
+  representations are evaluated on 500 held-out query pairs using
+  matching accuracy and Top-$K$ retrieval.}
+  \label{fig:pipeline}
 \end{figure}
 
 \subsection{Anchor Pairs and Query Protocol}
 \label{subsec:anchor_protocol}
 
 In conjunction with the approach employed by \textcite{hadgi2025escaping}, we extract the alignment spaces and evaluate the representations themselves utilizing a strictly-defined subset partition of the dataset to define an anchoring subset and a querying subset, composed of $n_A = 30{,}000$ and $500$ matched pairs respectively. This allows explicit training for Canonical Correlation Analysis (CCA) projection and affine-mapping construction from the canonical directions whilst, at the same time, maintaining unseen objects used exclusively to evaluate the quality of the generated alignments. All evaluated quantitative results were produced by taking the mean over three independent data splits defined by these anchor/query partitions.
+
+\paragraph{Hyperparameter Summary.} Table~\ref{tab:hyperparam_summary} consolidates the principal hyperparameters used across every alignment method evaluated in this thesis, most of which are introduced individually in their respective chapters but are collected here for ease of reference and reproducibility.
+
+\begin{table}[htpb]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llp{7.5cm}}
+\toprule
+\textbf{Method} & \textbf{Chapter} & \textbf{Key hyperparameters} \\
+\midrule
+CCA + Affine       & \ref{ch:baseline}   & $n_A=30{,}000$, $k=50$, 3 seeds, least-squares affine fit \\
+KCCA               & \ref{ch:nonlinear}  & RBF kernel, $\gamma=0.1$, Nystr\"{o}m landmarks $m=500$, $n_A=30{,}000$ \\
+RML                & \ref{ch:nonlinear}  & batch size 256, learning rate 0.01, 200 SGD iterations, Cholesky-factor parametrisation \\
+SGW                & \ref{ch:gw_alignment} & 100 random projection directions; best of 288-configuration grid search over $k \in \{20,50,100\}$, $n \in \{1\text{k},5\text{k},30\text{k}\}$, $\lambda \in \{0,0.1,1.0,10.0\}$, 3 seeds (best: $k=20$, $n=5{,}000$) \\
+RISGW              & \ref{ch:gw_alignment} & Stiefel manifold optimisation, 20 projections, 30 gradient iterations, $n=1{,}000$ \\
+SS-RISGW           & \ref{ch:gw_alignment} & $\lambda \in \{0, 0.1, 1.0, 10.0\}$, $n=1{,}000$ anchor pairs \\
+FGW                & \ref{ch:gw_alignment} & $\alpha=0.2$ (best), $k=50$ CCA subspace, $n_A=1{,}000$ \\
+LR-GW              & \ref{ch:gw_alignment} & rank $r \in \{2,\ldots,200\}$ (best $r{=}50$), $\epsilon \in \{10^{-4},\ldots,5.0\}$, angular cost, OTT-JAX / LRSinkhorn solver \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Consolidated hyperparameter summary across all alignment methods evaluated in this thesis. Full descriptions and ablation ranges are given in the corresponding chapter.}
+\label{tab:hyperparam_summary}
+\end{table}
 
 \section{Encoders}
 \label{sec:encoders_setup}
@@ -74,8 +102,8 @@ experimental choice allows us to isolate and observe the raw alignment
 capabilities of the spatial architecture itself, entirely separated from
 learned feature representations.
 
-\subsection{Text Encoders: CLIP, RoBERTa, and BERT}
-\label{subsec:text_encoders}
+\subsection{Text Encoders: OpenCLIP, RoBERTa, and BERT}
+\label{subsec:text_encoders_setup}
 
 For the textual modality, the central research question is whether purely
 linguistic representations can be mapped to 3D geometries via optimal
@@ -84,22 +112,22 @@ cross-modal alignment. To cover this spectrum, we extracted features using
 three distinct transformer-based models.
 
 Our strongest text backbone is the encoder derived from OpenCLIP
-(specifically the \texttt{ViT-bigG-14} variant). Because CLIP is
+(specifically the \texttt{ViT-bigG-14} variant). Because \gls{clip} is
 contrastively trained on massive image-text pairs, its latent space
 inherently encodes physical and visual semantics. We hypothesise that this
 underlying ``visual grounding'' makes its text embeddings significantly more
 compatible with 3D structural spaces.
 
-To evaluate purely linguistic spaces, we extracted text embeddings using BERT
-and RoBERTa. These models were trained strictly on masked language modelling
+To evaluate purely linguistic spaces, we extracted text embeddings using \gls{bert}
+and \gls{roberta}. These models were trained strictly on masked language modelling
 objectives over massive text corpora, with absolutely no exposure to visual,
-spatial, or geometric data. BERT provides our standard uni-modal baseline,
-while RoBERTa represents a heavily optimised evolution of the same
+spatial, or geometric data. \gls{bert} provides our standard uni-modal baseline,
+while \gls{roberta} represents a heavily optimised evolution of the same
 architecture. By comparing the alignment behaviour of these pure language
-models against CLIP, we can accurately quantify how much of the cross-modal
+models against \gls{clip}, we can accurately quantify how much of the cross-modal
 translation success relies on the text encoder already ``knowing'' what the
 physical world looks like --- a hypothesis that is directly validated by the
-results presented in Chapter~\ref{ch:baseline}, where CLIP-paired encoders
+results presented in Chapter~\ref{ch:baseline}, where \gls{clip}-paired encoders
 consistently and substantially outperform purely linguistic alternatives
 across all evaluation metrics.
 
@@ -123,3 +151,42 @@ Because exact matching can be overly rigid for multimodal tasks, Top-$K$ retriev
 For a given 3D query shape, we rank all 500 text embeddings based on their cosine distance (or Euclidean distance, depending on the space topology) from the query point. If the ground-truth text caption falls within the top $K$ nearest neighbors, the retrieval is considered successful. We report results for $K \in \{1, 5, 10\}$. 
 
 This metric is particularly insightful for analyzing latent spaces. A high Top-5 or Top-10 score, even with a low Top-1 score, suggests that the underlying geometry of the modalities is successfully clustering similar concepts together, even if the absolute nearest neighbor is slightly noisy. As we move into the Optimal Transport framework in the next chapters, these retrieval metrics will clearly expose whether Gromov-Wasserstein distances succeed at preserving these semantic neighborhoods or if they completely collapse the space.
+
+\section{Diagnostic Metrics}
+\label{sec:diagnostic_metrics}
+
+While Matching Accuracy and Top-$K$ Retrieval (Section~\ref{sec:metrics}) quantify \emph{how well} an alignment method performs, they offer no insight into \emph{why} a method succeeds or fails. To support the theoretical and diagnostic analysis carried out throughout Chapter~\ref{ch:gw_alignment} --- in particular, the thirteen-test ablation study and the structural non-isometry argument of Section~\ref{sec:why_gw_fails} --- this section formally introduces two complementary diagnostic tools: Centered Kernel Alignment, used to directly quantify the structural similarity between two representation spaces, and transport plan entropy, used to characterise the internal structure of a learned coupling matrix independently of its downstream retrieval accuracy.
+
+\subsection{Centered Kernel Alignment (CKA)}
+\label{subsec:cka_definition}
+
+Centered Kernel Alignment (CKA), introduced by \textcite{kornblith2019similarity}, measures the similarity between two sets of representations of the same $n$ samples, even when the representations have different dimensionalities. Given two feature matrices $X \in \mathbb{R}^{n \times d_1}$ and $Y \in \mathbb{R}^{n \times d_2}$, and two kernel matrices $K = k(X,X)$ and $L = l(Y,Y)$ computed over the two representation spaces, CKA is defined via the Hilbert-Schmidt Independence Criterion (HSIC) \cite{gretton2005measuring}:
+\begin{equation}
+    \mathrm{CKA}(K, L) = \frac{\mathrm{HSIC}(K, L)}{\sqrt{\mathrm{HSIC}(K, K) \, \mathrm{HSIC}(L, L)}}
+    \label{eq:cka}
+\end{equation}
+where $\mathrm{HSIC}(K, L) = \frac{1}{(n-1)^2} \mathrm{tr}(K H L H)$, and $H = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^\top$ is the centering matrix. In the special, computationally convenient case of a linear kernel ($K = XX^\top$, $L = YY^\top$), Equation~\ref{eq:cka} reduces to the closed-form expression:
+\begin{equation}
+    \mathrm{CKA}_{\mathrm{linear}}(X, Y) = \frac{\| Y^\top X \|_F^2}{\| X^\top X \|_F \, \| Y^\top Y \|_F}
+    \label{eq:linear_cka}
+\end{equation}
+which is the variant used throughout this thesis. CKA is bounded in $[0, 1]$, with a score of $0$ indicating no structural correlation between the two representation spaces, and a score of $1$ indicating that the pairwise geometric relationships of one space are perfectly recoverable from the other, up to an orthogonal transformation and isotropic scaling. Crucially, unlike the Gromov-Wasserstein distance of Section~\ref{sec:gw_distance}, computing CKA requires the two representation sets to be sampled over the \emph{same} underlying set of $n$ objects (i.e. it requires known correspondences), making it unsuitable as an unsupervised \emph{alignment} tool, but ideally suited as a supervised \emph{diagnostic}: because it is computed directly on the known 3D-text anchor pairs, it provides a ground-truth measurement of how structurally similar the two \emph{unaligned} latent spaces already are, independently of any alignment method applied to them. This is precisely the role CKA plays in the theoretical analysis of Section~\ref{subsec:isometry_bottleneck}, where the low CKA score reported by \textcite{hadgi2025escaping} between raw PointNet and CLIP embeddings ($\approx 0.12$) is used as independent corroborating evidence for the absence of structural isometry inferred from our own Gromov-Wasserstein ablation results.
+
+\subsection{Transport Plan Entropy and Diagonal Concentration}
+\label{subsec:entropy_definition}
+
+A second diagnostic tool used extensively in the ablation study of Chapter~\ref{ch:gw_alignment} (Test 11, Section~\ref{subsec:library_analysis}) examines the internal structure of a learned transport plan $T \in \mathbb{R}^{n \times n}$ directly, independently of the retrieval accuracy it produces. Two complementary statistics are used.
+
+\paragraph{Transport Plan Entropy.} As introduced in the entropic regularisation of Section~\ref{subsec:sinkhorn}, the (discrete) entropy of a transport plan is given by:
+\begin{equation}
+    H(T) = -\sum_{i,j} T_{ij} \log T_{ij}
+    \label{eq:plan_entropy}
+\end{equation}
+A transport plan that concentrates all of its mass on a single, semantically correct permutation of matches (the ideal outcome for cross-modal retrieval) has minimal entropy: in the extreme case of a perfect permutation matrix, $H(T) = 0$. Conversely, a maximally uninformative transport plan --- one that spreads mass uniformly across every possible pairing, i.e. $T_{ij} = 1/n^2$ for all $i,j$ --- attains the theoretical maximum entropy $H_{\max} = \log(n^2)$. A learned transport plan whose entropy sits close to $H_{\max}$ is therefore statistically indistinguishable from random guessing, regardless of the retrieval accuracy computed from it: this is precisely the diagnostic signature used to characterise the failure of unsupervised Gromov-Wasserstein solvers in Test 11.
+
+\paragraph{Diagonal-to-Uniform Concentration Ratio.} Because the ground-truth correspondence between a query set of $n$ 3D objects and their $n$ paired captions is, by construction, the identity permutation (query $i$ corresponds to caption $i$), a second, more interpretable diagnostic examines how much probability mass a transport plan places on its own diagonal relative to the uniform baseline:
+\begin{equation}
+    \rho(T) = \frac{\frac{1}{n}\sum_{i} T_{ii}}{\frac{1}{n^2}\sum_{i,j} T_{ij}}
+    \label{eq:diagonal_ratio}
+\end{equation}
+which measures the mean diagonal mass of $T$ relative to what would be expected under a uniform, entirely uninformative coupling. A ratio of $\rho(T) = 1.0$ indicates a transport plan indistinguishable from uniform noise, while $\rho(T) > 1$ indicates a genuine (if imperfect) tendency to recover the correct correspondences. This ratio is reported alongside CCA+Affine's implicit transport structure and the unsupervised GW solvers' output plans in Section~\ref{subsec:library_analysis}, providing a direct, retrieval-metric-independent confirmation that unsupervised solvers fail to recover any meaningful structural signal.

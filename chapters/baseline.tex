@@ -8,9 +8,9 @@ Before venturing into completely unsupervised optimal transport methods, we must
 
 The fundamental premise of this baseline is that mapping high-dimensional features directly across modalities is notoriously difficult due to modality-specific noise and varying spatial dimensionalities. To circumvent this, the alignment is split into a dimensionality reduction phase followed by a direct linear translation.
 
-Operating on our pre-defined subset of $n_A = 30{,}000$ paired anchors, we first fit a Canonical Correlation Analysis (CCA) model. CCA seeks linear projections that map both the 3D features ($X$) and the text features ($Y$) into a shared $k$-dimensional space such that their cross-correlation is maximized. Following the original authors' optimization strategies, we fix the target subspace dimensionality to $k = 50$. This drastic reduction effectively acts as an information filter, stripping away irrelevant features and isolating the core semantic signals common to both spaces.
+Operating on our pre-defined subset of $n_A = 30{,}000$ paired anchors, we first fit a Canonical Correlation Analysis (CCA) model. \gls{cca} seeks linear projections that map both the 3D features ($X$) and the text features ($Y$) into a shared $k$-dimensional space such that their cross-correlation is maximized. Following the original authors' optimization strategies, we fix the target subspace dimensionality to $k = 50$. This drastic reduction effectively acts as an information filter, stripping away irrelevant features and isolating the core semantic signals common to both spaces.
 
-Once the data is projected into this shared lower-dimensional subspace, we compute an affine transformation $T(x) = Rx + b$ using standard least-squares regression. This transformation learns to map the reduced 3D coordinates directly onto the text coordinates. During inference, any unseen 3D query is first projected via the learned CCA weights and then translated via the affine map into the text space, where standard nearest-neighbor retrieval can be evaluated.
+Once the data is projected into this shared lower-dimensional subspace, we compute an affine transformation $T(x) = Rx + b$ using standard least-squares regression. This transformation learns to map the reduced 3D coordinates directly onto the text coordinates. During inference, any unseen 3D query is first projected via the learned \gls{cca} weights and then translated via the affine map into the text space, where standard nearest-neighbor retrieval can be evaluated.
 
 \section{Results on All Encoder Pairs}
 \label{sec:baseline_results}
@@ -18,45 +18,70 @@ Once the data is projected into this shared lower-dimensional subspace, we compu
 We evaluated this supervised pipeline across all combinations of our selected 3D and text encoders using the 500 held-out query pairs. Table~\ref{tab:linear_baseline_results} summarizes the matching and Top-$K$ retrieval accuracies.
 
 \begin{table}[htpb]
-    \centering
-    \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{llcccc}
-        \toprule
-        \textbf{3D Encoder} & \textbf{Text Encoder} & \textbf{Match (\%)} & \textbf{Top-1 (\%)} & \textbf{Top-5 (\%)} & \textbf{Top-10 (\%)} \\
-        \midrule
-        \multicolumn{6}{c}{\textit{Pre-trained 3D Backbone}} \\
-        \midrule
-        PointNet & CLIP (ViT-bigG-14) & \textbf{13.5} & \textbf{14.6} & \textbf{35.7} & \textbf{46.4} \\
-        PointNet & RoBERTa & 8.9 & 10.3 & 28.3 & 38.5 \\
-        PointNet & BERT & 7.2 & 8.5 & 25.0 & 35.4 \\
-        \midrule
-        \multicolumn{6}{c}{\textit{Untrained 3D Backbone (Random Weights)}} \\
-        \midrule
-        SparseConv & CLIP (ViT-bigG-14) & 3.6 & 4.4 & 13.1 & 20.7 \\
-        SparseConv & RoBERTa & 3.5 & 3.9 & 13.3 & 19.0 \\
-        SparseConv & BERT & 2.0 & 2.7 & 10.2 & 16.0 \\
-        \bottomrule
-    \end{tabular}
-    \vspace{0.2cm}
-    \caption{Retrieval and matching accuracy of the CCA + Affine baseline across 500 unseen queries. The subspace dimension is fixed at $k=50$. Models paired with CLIP consistently outperform purely linguistic encoders.}
-    \label{tab:linear_baseline_results}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+\textbf{3D Encoder} & \textbf{Text Encoder} & \textbf{Match (\%)} & \textbf{Top-1 (\%)} & \textbf{Top-5 (\%)} & \textbf{Top-10 (\%)} \\
+\midrule
+\multicolumn{6}{c}{\textit{Pre-trained 3D Backbone}} \\
+\midrule
+PointNet & CLIP (ViT-bigG-14)  & \textbf{13.5} & \textbf{14.6} & \textbf{35.7} & \textbf{46.4} \\
+PointNet & RoBERTa              & 8.9  & 10.3 & 28.3 & 38.5 \\
+PointNet & BERT                 & 7.2  &  8.5 & 25.0 & 35.4 \\
+\midrule
+\multicolumn{6}{c}{\textit{Untrained 3D Backbone (Random Weights)}} \\
+\midrule
+SparseConv & CLIP (ViT-bigG-14) & 3.6 & 4.4 & 13.1 & 20.7 \\
+SparseConv & RoBERTa             & 3.5 & 3.9 & 13.3 & 19.0 \\
+SparseConv & BERT                & 2.0 & 2.7 & 10.2 & 16.0 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Retrieval and matching accuracy of the CCA + Affine baseline
+across 500 unseen queries. The subspace dimension is fixed at $k=50$,
+averaged over 3 random seeds. Models paired with \gls{clip} consistently
+outperform purely linguistic encoders.}
+\label{tab:linear_baseline_results}
 \end{table}
 
-The quantitative output clearly isolates the impact of the text encoder's prior training regime. When PointNet is paired with the OpenCLIP text encoder, the system achieves a peak Top-5 retrieval accuracy of $35.7\%$. Conversely, when attempting to map the exact same PointNet geometric features onto BERT or RoBERTa, the alignment performance drops noticeably. 
+The quantitative output clearly isolates the impact of the text encoder's prior training regime. When PointNet is paired with the OpenCLIP text encoder, the system achieves a peak Top-5 retrieval accuracy of $35.7\%$. Conversely, when attempting to map the exact same PointNet geometric features onto \gls{bert} or \gls{roberta}, the alignment performance drops noticeably.
+
+\paragraph{Note on run-to-run variance.} Because the \gls{cca} anchor/query
+split is re-sampled per run, independent re-executions of the \gls{cca}+Affine
+baseline used as a reference point in companion experiments (Chapters
+\ref{ch:nonlinear} and \ref{ch:gw_alignment}) yielded slightly different
+Top-5 values on PointNet$\times$\gls{clip}: $34.1\%$ in the run paired with the
+KCCA/RML evaluation, and $33.2\%$ in the run paired with the cross-library
+GW verification (Test 10, Section~\ref{subsec:library_analysis}), against
+the $35.7\%$ reported here as the representative value averaged over 3
+seeds in Table~\ref{tab:linear_baseline_results}. This variation
+($\pm 2$ percentage points) reflects the inherent stochasticity of the \gls{cca}
+fitting procedure across different random splits rather than a
+methodological inconsistency, and all comparative claims made throughout
+this thesis (performance ratios, method rankings) are robust to this range
+of variation.
 
 \begin{figure}[htpb]
-    \centering
-    % \includegraphics[width=0.75\linewidth]{images/top1_accuracy_bar_chart.png}
-    \framebox(300, 200){[Image Placeholder: Bar chart comparing Top-1 accuracy of CLIP, RoBERTa, BERT, and Random]}
-    \caption{Top-1 Retrieval Accuracy across different language models. The visual grounding inherent in CLIP provides a significantly more accessible target space for 3D alignment compared to standard masked-language models.}
-    \label{fig:top1_bar_chart}
+  \centering
+  \includegraphics[width=1\textwidth]{fig_top1_barchart}
+  \caption{Top-1 Retrieval Accuracy of the CCA + Affine baseline across
+  the three text encoders, using PointNet as the 3D backbone ($k=50$,
+  30,000 anchors, 500 queries, averaged over 3 seeds). The random
+  baseline ($\approx 0.2\%$, grey) confirms that all supervised methods
+  substantially exceed chance-level performance. OpenCLIP significantly
+  outperforms purely linguistic encoders, confirming that visual
+  pre-training makes text representations inherently more compatible
+  with 3D geometric spaces.}
+  \label{fig:top1_bar_chart}
 \end{figure}
 
 \section{Discussion}
 \label{sec:baseline_discussion}
 
-The success of the CCA + Affine pipeline offers several critical insights into the topological behavior of these neural networks. First and foremost, it validates the hypothesis that language models trained concurrently with images (such as CLIP) construct a latent space that is inherently more "geometric." Because CLIP has been forced to align text with 2D visual structures during its massive pre-training phase, its text embeddings maintain a spatial logic that is much easier for a 3D encoder to map onto via linear translation.
+The success of the \gls{cca} + Affine pipeline offers several critical insights into the topological behavior of these neural networks. First and foremost, it validates the hypothesis that language models trained concurrently with images (such as \gls{clip}) construct a latent space that is inherently more "geometric." Because \gls{clip} has been forced to align text with 2D visual structures during its massive pre-training phase, its text embeddings maintain a spatial logic that is much easier for a 3D encoder to map onto via linear translation.
 
-However, the most surprising finding emerges from the SparseConv experiments. Even when the 3D backbone is initialized with completely random weights and subjected to no pre-training whatsoever, the alignment pipeline still manages to achieve a $13.1\%$ Top-5 accuracy with CLIP. This phenomenon occurs because the random projection of the 3D points still preserves a baseline degree of spatial covariance. The CCA step acts as a powerful feature selector, mining these raw geometric correlations and discarding the noise, which ultimately allows the affine map to capture a weak but statistically significant alignment signal.
+However, the most surprising finding emerges from the SparseConv experiments. Even when the 3D backbone is initialized with completely random weights and subjected to no pre-training whatsoever, the alignment pipeline still manages to achieve a $13.1\%$ Top-5 accuracy with \gls{clip}. This phenomenon occurs because the random projection of the 3D points still preserves a baseline degree of spatial covariance. The \gls{cca} step acts as a powerful feature selector, mining these raw geometric correlations and discarding the noise, which ultimately allows the affine map to capture a weak but statistically significant alignment signal.
 
-While these supervised results are highly promising, they heavily depend on the availability of 30,000 perfectly paired anchors to explicitly learn the projection matrices. In real-world scenarios, acquiring such massive, curated datasets of paired 3D-text data is prohibitively expensive and time-consuming. This operational limitation naturally motivates the core objective of our thesis: can we bypass the need for paired anchors altogether? In the following chapter, we completely discard the supervised CCA + Affine pipeline and attempt to align the raw representational spaces using purely unsupervised Optimal Transport, investigating whether the inherent topologies of these spaces possess the structural isometry required to be matched without explicit supervision.
+While these supervised results are highly promising, they heavily depend on the availability of 30,000 perfectly paired anchors to explicitly learn the projection matrices. In real-world scenarios, acquiring such massive, curated datasets of paired 3D-text data is prohibitively expensive and time-consuming. This operational limitation naturally motivates the core objective of our thesis: can we bypass the need for paired anchors altogether? In the following chapter, we completely discard the supervised \gls{cca} + Affine pipeline and attempt to align the raw representational spaces using purely unsupervised Optimal Transport, investigating whether the inherent topologies of these spaces possess the structural isometry required to be matched without explicit supervision.

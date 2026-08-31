@@ -1,159 +1,102 @@
 \chapter{Gromov-Wasserstein Alignment}
 \label{ch:gw_alignment}
 
-While the supervised CCA baseline demonstrated that a linear cross-modal
-mapping is attainable, relying on large-scale paired datasets fundamentally
-limits the scalability and generalization of multimodal learning. This chapter
-investigates whether the 3D and textual latent spaces can be aligned in a
-purely unsupervised or semi-supervised manner by leveraging the mathematical
-framework of Optimal Transport (OT).
+The supervised \gls{cca} baseline showed that a linear cross-modal mapping is achievable, but leaning on large paired datasets fundamentally caps how scalable and generalisable that kind of multimodal learning can be. This chapter asks the natural follow-up question: can the 3D and textual latent spaces be aligned in a purely unsupervised or semi-supervised way instead, using the mathematical machinery of Optimal Transport (OT)?
 
-Standard OT methods, such as the classic Wasserstein distance, require both
-distributions to lie within the same metric space to compute a direct transport
-cost. Because our 3D geometries and text captions inhabit completely disjoint
-and heterogeneous dimensional spaces, we frame the alignment as a metric
-measure problem using the Gromov-Wasserstein ($\mathcal{GW}$) distance.
-Rather than comparing feature coordinates directly, $\mathcal{GW}$ attempts
-to match the intra-modal topological structures---essentially aligning the
-pairwise distance matrices of the two spaces. However, transitioning from
-this elegant mathematical theory to empirical application requires navigating
-severe computational bottlenecks and strict geometric assumptions. This chapter
-details our implementation of scalable $\mathcal{GW}$ variants, documents a
-comprehensive ablation study, and ultimately exposes the critical failure
-points of the structural isometry assumption in real-world neural
-representations.
+Standard \gls{ot} methods --- the classic Wasserstein distance, for instance --- need both distributions to live in the same metric space to compute a direct transport cost. Our 3D geometries and text captions don't cooperate here: they inhabit completely disjoint, heterogeneous dimensional spaces. So we frame the alignment as a metric measure problem instead, using the Gromov-Wasserstein ($\mathcal{GW}$) distance, which compares intra-modal topological structure --- essentially the pairwise distance matrices of the two spaces --- rather than feature coordinates directly. Getting from this elegant mathematical theory to something that actually runs, though, means navigating some serious computational bottlenecks and fairly strict geometric assumptions. This chapter works through our implementation of scalable $\mathcal{GW}$ variants, documents a comprehensive ablation study, and ultimately lays bare exactly where the structural isometry assumption breaks down for real-world neural representations.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Methods and Implementation}
 \label{sec:gw_methods}
 
-The standard $\mathcal{GW}$ optimization problem is notoriously expensive.
-Solving for the exact dense coupling matrix $\pi$ generally scales at
-$\mathcal{O}(n^3)$ with respect to the number of samples, while the memory
-complexity for storing the cost matrices scales at $\mathcal{O}(n^2)$. Given
-our objective to align tens of thousands of high-dimensional embeddings
-extracted from the Objaverse dataset, computing the exact transport plan is
-computationally intractable, even when utilizing the University of Padova's
-HPC cluster infrastructure. To make this alignment feasible, we implemented
-several advanced relaxations and hardware-accelerated OT solvers.
+The standard $\mathcal{GW}$ optimisation problem is expensive by nature. Solving for the exact dense coupling matrix $\pi$ scales at $\mathcal{O}(n^3)$ with the number of samples, and the memory cost of storing the cost matrices scales at $\mathcal{O}(n^2)$. Given that we're trying to align tens of thousands of high-dimensional embeddings from Objaverse, computing the exact transport plan simply isn't feasible --- not even on the University of Padova's HPC infrastructure. To make the alignment tractable at all, we implemented several advanced relaxations and hardware-accelerated \gls{ot} solvers.
 
 \subsection{Sliced GW and Rotation-Invariant Variants}
 \label{subsec:sliced_gw}
 
-One of the most persistent issues when processing diverse 3D objects from
-expansive, crowdsourced datasets like Objaverse is the lack of canonical
-orientation. Unlike carefully curated synthetic datasets, a vehicle in
-Objaverse might be aligned along the positive Z-axis in one mesh and the
-negative X-axis in another. If the geometric encoder does not inherently
-guarantee rotation invariance, these arbitrary spatial orientations translate
-directly into distorted intra-modal distance matrices, artificially inflating
-the structural discrepancy between the 3D and text manifolds.
+One persistent headache when working with diverse 3D objects from a crowdsourced dataset like Objaverse is that there's no canonical orientation. A vehicle might sit along the positive Z-axis in one mesh and the negative X-axis in another, with nothing to normalise that away. If the geometric encoder doesn't guarantee rotation invariance on its own, these arbitrary orientations bleed directly into distorted intra-modal distance matrices, inflating the apparent structural gap between the 3D and text manifolds artificially.
 
-To mitigate this without forcing a computationally heavy pre-alignment phase,
-we integrated rotation-invariant formulations of the Gromov-Wasserstein
-problem. To further accelerate the optimization process, we employed Sliced
-Gromov-Wasserstein (SGW) approximations \cite{vayer2019}. Instead of solving
-the complex assignment problem in high-dimensional space, SGW iteratively
-projects the feature distributions onto random 1-dimensional lines. In 1D
-space, the optimal transport plan can be computed extremely efficiently in
-$\mathcal{O}(n \log n)$ time using simple sorting algorithms. By integrating
-these 1D costs over hundreds of random projection directions, we obtained a
-robust approximation of the true $\mathcal{GW}$ distance, which allowed us
-to aggressively scale our batch sizes during the initial exploratory
-experiments without exhausting the memory limits of our NVIDIA A100 GPUs.
+To handle this without a computationally heavy pre-alignment step, we brought in rotation-invariant formulations of the Gromov-Wasserstein problem. Following Algorithm 1 of Vayer et al.~\cite{vayer2019optimal}, we used Sliced Gromov-Wasserstein (SGW) approximations: for each of 100 random unit vectors $\theta \in S^{k-1}$, both spaces get projected onto $\theta$, the projections are sorted, and whichever ordering --- identity or anti-identity --- minimises the 1D \gls{gw} cost gets a vote in a running score matrix. No supervision anywhere in this configuration. Because 1D optimal transport plans can be computed in $\mathcal{O}(n \log n)$ time via simple sorting, integrating these costs over hundreds of random projections gave us a solid approximation of the true $\mathcal{GW}$ distance, which let us scale batch sizes fairly aggressively during early exploratory runs without running into memory limits on our NVIDIA A100 GPUs.
 
-The Rotation-Invariant SGW (RISGW) variant extends this by explicitly
-optimising a rotation matrix $\Delta$ on the Stiefel manifold (via Pymanopt
-and JAX autodiff) to find the projection directions that minimise the SGW
-cost. A Semi-Supervised extension (SS-RISGW) further incorporates an anchor
-supervision penalty term, weighted by $\lambda \in \{0, 0.1, 1.0, 10.0\}$,
-to weakly guide the rotation towards known correspondences.
+The Rotation-Invariant SGW (RISGW) variant builds on this by explicitly optimising a rotation matrix $\Delta$ on the Stiefel manifold (via Pymanopt and \gls{jax} autodiff) to minimise $\text{SGW}_\Delta(X, Y)$, using 20 projection directions and 30 gradient descent iterations, again with no supervision. A Semi-Supervised extension (SS-RISGW) adds an anchor supervision penalty term, $\text{loss}(\Delta) = \text{SGW}_\Delta + \lambda \|\Delta X_{\text{anc}} - Y_{\text{anc}}\|^2$, weighted by $\lambda \in \{0, 0.1, 1.0, 10.0\}$, to gently steer the rotation toward known correspondences --- this is the only \gls{gw} variant tested that explicitly uses anchor labels in its objective.
 
 \subsection{Fused GW and Anchor-Constrained FGW}
 \label{subsec:fused_gw}
 
-While pure $\mathcal{GW}$ relies exclusively on the topological structure
-(the relational distance matrices $C_X$ and $C_Y$), Fused Gromov-Wasserstein
-(FGW) \cite{vayer2019fgw} introduces a mechanism to combine structural
-matching with direct feature matching. The FGW formulation utilizes a
-hyperparameter $\alpha \in [0, 1]$ that dictates the trade-off between the
-Wasserstein cost (feature alignment) and the Gromov-Wasserstein cost
-(structural alignment):
+Worth flagging up front: the anchor and sample counts used for the unsupervised and semi-supervised GW variants (Table~\ref{tab:gw_results}) are deliberately smaller than the $n_A = 30{,}000$ anchors used for CCA+Affine. That's a computational necessity, not an arbitrary choice. FGW needs a dense $n \times n$ feature-distance cost matrix, and at $n = 30{,}000$ that's roughly 3.6\,GB of memory and prohibitively slow to compute, even on GPU. SGW is much cheaper ($\mathcal{O}(Ln\log n)$ for $L$ projections), but an exhaustive grid search across anchor counts $n \in \{1\text{k}, 5\text{k}, 30\text{k}\}$ (details in Appendix~\ref{app:appendix_a}) turned up no systematic improvement past $n=5{,}000$ samples --- which tells us the bottleneck here is structural, rooted in the absence of exploitable isometry, and not simply a consequence of using fewer anchors.
+
+Pure $\mathcal{GW}$ relies exclusively on topological structure --- the relational distance matrices $C_X$ and $C_Y$ --- but Fused Gromov-Wasserstein (FGW) \cite{vayer2019optimal}, implemented here via the \gls{pot} library, adds a mechanism for combining structural matching with direct feature matching. The \gls{fgw} formulation uses a hyperparameter $\alpha \in [0, 1]$ to control the trade-off between the Wasserstein cost (feature alignment) and the Gromov-Wasserstein cost (structural alignment):
 \begin{equation}
     \text{FGW}(X, Y) = (1 - \alpha)\,W(X, Y) + \alpha\,\mathcal{GW}(X, Y)
     \label{eq:fgw}
 \end{equation}
 
-Because our modalities occupy disjoint spaces, a direct feature cost is only
-possible after projecting both spaces into a shared CCA subspace. We therefore
-operated FGW in the $k=50$ CCA subspace and swept $\alpha$ from 0 to 1,
-finding the best result at $\alpha = 0.2$ with 1,000 anchor pairs.
+Since our modalities occupy disjoint spaces, a direct feature cost only makes sense once both are projected into a shared \gls{cca} subspace. We ran \gls{fgw} in the $k=50$ \gls{cca} subspace, swept $\alpha$ from 0 to 1, and found the best result at $\alpha = 0.2$ with 1,000 anchor pairs.
 
-We also evaluated an Anchor-Constrained FGW variant, in which the cost matrix
-was modified to assign zero cost to the 1,000 known anchor pairs, with an
-additional penalty on off-diagonal anchor entries (penalty values
-$\in \{0, 10, 100\}$). The intent was to force the solver to respect known
-ground-truth correspondences as fixed structural scaffolding. In both cases,
-results were identical to standard FGW at $4.4\%$ Top-5, indicating that the
-structural incompatibility of the spaces is too severe for even locally
-supervised anchoring to overcome.
+We also tried an Anchor-Constrained \gls{fgw} variant --- extending the setup to include anchor and query points together (1,500 total samples), setting the feature-distance matrix to zero cost on the known anchor pairs $(i,i)$, and adding a penalty on off-diagonal anchor entries (penalty values $\in \{0, 10, 100\}$). The idea was to use known correspondences as fixed structural scaffolding for the solver to build around. Both configurations landed on identical results to standard \gls{fgw}, $4.4\%$ Top-5 --- the structural incompatibility here is apparently too severe for even locally supervised anchoring to overcome.
 
 \subsection{Low-Rank GW via OTT-JAX}
 \label{subsec:low_rank_gw}
 
-For our definitive, large-scale unsupervised experiments, we transitioned our
-pipeline to the OTT-JAX library. This framework is specifically built on top
-of JAX to support hardware-accelerated, auto-differentiable optimal transport,
-allowing us to fully exploit the parallelisation capabilities of the Slurm
-cluster.
+For the definitive, large-scale unsupervised experiments, and following the OTT-JAX tutorial the supervisor assigned, we moved our pipeline over to the OTT-JAX library, built specifically on top of \gls{jax} to support hardware-accelerated, auto-differentiable optimal transport --- which let us make full use of the Slurm cluster's parallelisation.
 
-Rather than computing the full, dense transport plan
-$\pi \in \mathbb{R}^{n \times n}$, we utilised the library's Low-Rank
-Gromov-Wasserstein solver. This method factors the coupling matrix into two
-much smaller matrices, effectively bounding the rank to a user-defined
-parameter $r$ (where $r \ll n$). Factoring the transport plan not only
-reduced the spatial complexity from quadratic to linear---enabling the
-simultaneous processing of massively larger subsets of our 46,675 paired
-samples---but it also served as an implicit regularizer. By restricting the
-rank, the solver is forced to focus on aligning the dominant, macro-level
-topological clusters of the latent spaces, intrinsically filtering out
-high-frequency noise and minor geometric inconsistencies inherent to the
-raw 3D mesh encodings.
+Rather than computing the full, dense transport plan $\pi \in \mathbb{R}^{n \times n}$, we used the library's Low-Rank Gromov-Wasserstein solver, with LRSinkhorn as the linear sub-solver, factorising the coupling matrix as $T \approx Q\,\text{diag}(1/g)\,R^\top$ with a user-defined rank $r$ (where $r \ll n$). We ran this with an angular cost function, matching Li et al.'s Eq.~3 \cite{li2026scale}. Factoring the transport plan cut the spatial complexity from quadratic to linear --- letting us process much larger subsets of our 46,675 paired samples at once --- and doubled as an implicit regulariser: restricting the rank forces the solver to focus on the dominant, macro-level topological clusters of the latent spaces, filtering out high-frequency noise and minor geometric quirks in the raw 3D mesh encodings along the way.
+
+\subsection{Computational Cost}
+\label{subsec:computational_cost}
+
+Table~\ref{tab:runtime_summary} reports representative wall-clock runtimes for the main LR-GW configurations used throughout this chapter, measured during the diagnostic and ablation runs of Section~\ref{sec:ablation_study}. These numbers come from the CPU nodes of the \texttt{labsrv7} cluster rather than GPU hardware, since the fine-grained epsilon and pre/post-CCA sweeps of Tests 12--13 ran as lightweight verification jobs; the main-scale experiments of Section~\ref{sec:gw_results} and the encoder-matrix sweep of Test 9, by contrast, ran on the NVIDIA A100 GPUs described in Section~\ref{sec:dataset_objaverse}. Read the per-configuration times below as indicative of the entropic-regularisation solver's cost at $n{=}500$ query-scale problems on general-purpose hardware, rather than as a GPU-optimised benchmark.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{Theoretical Complexity} & \textbf{Rank} & \textbf{Wall-clock time} \\
+\midrule
+LR-GW, post-CCA ($k$=50)      & $\mathcal{O}(n^2)$ per Sinkhorn iter. & $r$=20 & $\approx$289s per $\epsilon$ value \\
+LR-GW, pre-CCA (raw features) & $\mathcal{O}(n^2)$ per Sinkhorn iter. & $r$=20 & $\approx$293s per $\epsilon$ value \\
+GW diagnostic (6 pairs, 3 seeds) & $\mathcal{O}(n^2)$ per pair & --- & 8m01s total \\
+\bottomrule
+\end{tabular}
+\caption{Representative wall-clock runtimes for the epsilon sweep of Test 13
+(Section~\ref{subsec:advanced_verifications}) and the diagnostic GW analysis
+of Section~\ref{sec:why_gw_fails}, measured on CPU nodes of the
+\texttt{labsrv7} cluster at query-scale ($n{=}500$--$1{,}000$). Both the
+post- and pre-CCA configurations show near-identical per-iteration cost,
+consistent with the fact that LR-GW's complexity depends on the number of
+samples $n$ rather than on the input feature dimensionality, since the
+solver operates on $n \times n$ intra-domain distance matrices rather than
+on the raw feature vectors.}
+\label{tab:runtime_summary}
+\end{table}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Results}
 \label{sec:gw_results}
 
-Evaluating the quality of the alignments generated by the Gromov-Wasserstein
-solvers requires a direct comparison against the supervised upper bound
-established in Chapter~\ref{ch:baseline}. To ensure absolute fairness, all
-OT-based matching and retrieval metrics were computed on the exact same
-held-out query set of 500 pairs, utilising the distance representations
-extracted from the PointNet and CLIP (ViT-bigG-14) backbones.
+Evaluating how well the Gromov-Wasserstein solvers align things means comparing them directly against the supervised upper bound established in Chapter~\ref{ch:baseline}. To keep the comparison fair, all \gls{ot}-based matching and retrieval metrics were computed on the exact same held-out query set of 500 pairs, using distance representations extracted from the PointNet and \gls{clip} (ViT-bigG-14) backbones.
 
-A preliminary glance at the quantitative outcomes reveals a stark contrast
-between the theoretical elegance of optimal transport and its practical
-applicability to complex, real-world neural representations. We dissect these
-findings by first examining the purely unsupervised solvers, followed by an
-analysis of the semi-supervised anchoring experiments.
+A first look at the numbers reveals a stark gap between the theoretical elegance of optimal transport and how it actually performs on complex, real-world neural representations. We'll work through the purely unsupervised solvers first, then move to the semi-supervised anchoring experiments.
 
 \subsection{Quantitative Evaluation of Unsupervised GW}
 \label{subsec:unsupervised_gw_results}
 
-Our primary experimental objective was to achieve true zero-shot alignment
-using Sliced Gromov-Wasserstein (SGW) and the Low-Rank Gromov-Wasserstein
-(LR-GW) implementations. These solvers were tasked with constructing a
-coupling matrix $\pi$ relying exclusively on the intra-modal pairwise
-distance matrices $C_X$ and $C_Y$, without any cross-modal anchor points to
-guide the optimisation. The retrieval accuracies are reported in
-Table~\ref{tab:gw_results}.
+Our main goal was true zero-shot alignment, using the Sliced Gromov-Wasserstein (SGW) and Low-Rank Gromov-Wasserstein (LR-GW) implementations. Both were tasked with building a coupling matrix $\pi$ using only the intra-modal pairwise distance matrices $C_X$ and $C_Y$ --- no cross-modal anchor points anywhere to guide the optimisation. Table~\ref{tab:gw_results} reports the retrieval accuracies.
+
+Note that the ``$n$'' column reports the number of samples used to estimate
+the intra-domain distance matrices $C_X$ and $C_Y$ (or, for semi-supervised
+variants, the number of anchor pairs used in the supervised penalty term).
+For fully unsupervised methods ($\times$), this is \emph{not} paired
+cross-modal supervision: the samples are drawn independently from each
+modality and no ground-truth correspondence is used during optimisation.
 
 \begin{table}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
-\textbf{Alignment Method} & \textbf{Sup.} & \textbf{Anc.}
+\textbf{Alignment Method} & \textbf{Sup.} & \textbf{$n$ (samples)}
     & \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
 \midrule
 \multicolumn{7}{l}{\textit{Supervised Baseline (Upper Bound)}} \\
@@ -166,7 +109,7 @@ Low-Rank GW ($r$=20, angular)      & $\times$   & 30k & 1.6\%  & ---    & 1.2\% 
 \midrule
 \multicolumn{7}{l}{\textit{Semi-Supervised / Constrained Optimal Transport}} \\
 SS-RISGW ($\lambda$=1.0, best)     & $\sim$     & 1k  & 0.2\%  & 0.2\%  & 1.4\%           & 2.6\%  \\
-FGW ($\alpha$=0.2, best)           & $\times$   & 1k  & 3.6\%  & 3.6\%  & \textbf{4.4\%}  & 5.4\%  \\
+FGW ($\alpha$=0.2, best)           & $\sim$     & 1k  & 3.6\%  & 3.6\%  & \textbf{4.4\%}  & 5.4\%  \\
 FGW anchor-constrained (pen.=10)   & $\sim$     & 1k  & 3.6\%  & 3.6\%  & 4.4\%           & 5.4\%  \\
 \midrule
 \multicolumn{7}{l}{\textit{Random Baseline}} \\
@@ -176,111 +119,47 @@ Independent Gaussian               & ---        & --- & $\approx$0.6\% & $\appro
 \end{tabular}%
 }
 \caption{Retrieval performance of all Gromov-Wasserstein variants on
-PointNet $\times$ CLIP. $\times$ = unsupervised, $\sim$ = partially
+PointNet $\times$ CLIP. $\times$ = unsupervised, $\sim$ = partially/semi
 supervised, \checkmark = fully supervised. The best OT method (FGW,
 4.4\% Top-5) is $8\times$ below CCA+Affine (35.7\%).
-CCA+Affine result taken from Table~\ref{tab:baseline_results}
+CCA+Affine result taken from Table~\ref{tab:linear_baseline_results}
 (Chapter~\ref{ch:baseline}); all other results: same protocol,
-30,000 anchor pairs, 500 query points, $k=50$, averaged over 3 seeds.}
+500 query points, $k=50$, averaged over 3 seeds.}
 \label{tab:gw_results}
 \end{table}
 
-The performance of all purely unsupervised methods experienced a catastrophic
-drop compared to the linear baseline. In several runs, the exact matching
-accuracy hovered marginally above random chance. Rather than discarding this
-as a mere algorithmic failure, inspecting the output of the optimal transport
-plan provides deep insights into the latent space topologies.
+Every purely unsupervised method collapsed compared to the linear baseline. In several runs, exact matching accuracy barely cleared random chance. Rather than write this off as a plain algorithmic failure, it's worth digging into what the transport plan itself actually looks like --- it turns out to be quite revealing about the underlying latent space topologies.
 
-Unlike the CCA projection---which forcibly aligns the axes of maximum variance
-based on known semantic pairs---the GW solver operates purely on geometric
-faith. It attempts to overlay the shape of the 3D distance manifold directly
-onto the text distance manifold. The extreme degradation in Top-$K$ retrieval
-indicates that minimizing the global metric measure discrepancy (the GW
-objective) does not correlate with minimizing the semantic discrepancy. In
-practice, the optimiser frequently fell into localised topological traps. For
-instance, tightly clustered groups of 3D objects (such as the heavily
-populated categories of ``furniture'' or ``vehicles'' in Objaverse) were
-mapped en masse to completely unrelated but similarly dense clusters in the
-text space. The algorithm successfully matched the statistical \textit{density}
-and \textit{variance} of the distributions, but completely scrambled their
-\textit{identities}.
+The \gls{cca} projection forcibly aligns the axes of maximum variance based on known semantic pairs; the \gls{gw} solver has no such luxury and operates purely on geometric faith, trying to overlay the shape of the 3D distance manifold directly onto the text distance manifold. The severe drop in Top-$K$ retrieval tells us something important: minimising the global metric measure discrepancy (the \gls{gw} objective) simply doesn't track with minimising semantic discrepancy. In practice, the optimiser kept falling into localised topological traps. Densely populated categories in Objaverse --- ``furniture'' or ``vehicles,'' say --- got mapped en masse onto completely unrelated but similarly dense clusters in the text space. The algorithm was matching statistical \textit{density} and \textit{variance} just fine; it was scrambling \textit{identities} entirely.
 
-Furthermore, the low-rank constraint in OTT-JAX, while computationally
-necessary to avoid out-of-memory errors on the HPC cluster, inherently forced
-the coupling matrix to smooth out high-frequency matching details. While this
-filtering effect is beneficial for stabilising gradients during optimisation,
-it proved detrimental for exact instance-level retrieval, often resulting in
-``many-to-one'' assignments where multiple distinct 3D queries collapsed onto
-a single, centrally located text embedding.
+On top of that, the low-rank constraint in OTT-JAX, while necessary to avoid running out of memory on the HPC cluster, forces the coupling matrix to smooth out high-frequency matching details. That smoothing helps stabilise gradients during optimisation, but it's genuinely bad news for exact instance-level retrieval, often producing ``many-to-one'' assignments where several distinct 3D queries all collapse onto a single, centrally located text embedding.
 
 \subsection{The Impact of Semi-Supervised Anchoring (FGW)}
 \label{subsec:fgw_results}
 
-Given the collapse of the purely unsupervised approach, we analysed whether
-injecting a partial supervised signal into the transport plan could rescue
-the alignment. The Fused Gromov-Wasserstein (FGW) framework allows this by
-combining a direct feature-distance term with the structural GW term via the
-trade-off parameter $\alpha$. We tested $\alpha = 0.2$ on 1,000 anchor
-pairs---a configuration that places stronger weight on the Wasserstein
-(feature-distance) term relative to the structural GW term.
+Given how badly the purely unsupervised approach collapsed, the obvious next question was whether injecting even a little supervised signal into the transport plan could rescue things. Fused Gromov-Wasserstein (FGW) does exactly this, combining a direct feature-distance term with the structural \gls{gw} term through the trade-off parameter $\alpha$. We tested $\alpha = 0.2$ on 1,000 anchor pairs --- a configuration that leans harder on the Wasserstein (feature-distance) term than on the structural \gls{gw} term.
 
-We also evaluated an Anchor-Constrained FGW variant, setting cost zero on
-the 1,000 known anchor pairs in the feature-distance matrix, with an
-additional penalty on off-diagonal anchor entries (penalty $\in \{0, 10,
-100\}$). The intent was to use the known correspondences as immovable
-structural pegs around which the remaining unsupervised assignments would
-be constructed.
+We also tried an Anchor-Constrained \gls{fgw} variant, setting cost to zero on the 1,000 known anchor pairs in the feature-distance matrix, with an additional penalty on off-diagonal anchor entries (penalty $\in \{0, 10, 100\}$), treating known correspondences as immovable structural pegs around which the remaining unsupervised assignments would form.
 
-Both configurations produced identical results: 4.4\% Top-5, the same as
-standard FGW (Table~\ref{tab:gw_results}). The anchor constraints failed to
-propagate any additional alignment signal across the broader geometry. This
-outcome strongly suggests that the structural incompatibility between the two
-spaces is too fundamental for even locally supervised anchoring to overcome
---- a hypothesis we investigate rigorously in the ablation study of
-Section~\ref{sec:ablation_study}.
+Both configurations came out identical: 4.4\% Top-5, matching standard \gls{fgw} exactly (Table~\ref{tab:gw_results}). The anchor constraints didn't propagate any additional alignment signal through the broader geometry at all. That strongly suggests the structural incompatibility between the two spaces runs too deep for even locally supervised anchoring to fix --- a hypothesis we dig into properly in the ablation study of Section~\ref{sec:ablation_study}.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Ablation Study --- Thirteen Diagnostic Tests}
 \label{sec:ablation_study}
 
-The catastrophic degradation of retrieval accuracy observed in our
-unsupervised experiments necessitated a rigorous diagnostic phase. When an
-optimisation algorithm fails to converge to a meaningful semantic mapping,
-the failure can typically be attributed to one of three sources: a bug in
-the code implementation, an unstable hyperparameter configuration, or a
-fundamental incompatibility in the underlying mathematical assumptions of
-the data.
-
-To systematically isolate the root cause, we designed and executed an
-exhaustive ablation study comprising thirteen distinct experimental
-configurations. This rigorous testing framework was designed to challenge
-every variable in our pipeline sequentially, ensuring that the poor
-performance of Gromov-Wasserstein was a genuine reflection of the latent
-space topologies rather than a technical oversight. Tests 1 through 11 cover
-standard algorithmic variations, while Tests 12 and 13 address advanced
-methodological verifications regarding feature preprocessing and entropic
-smoothing, and were added following specific instructions from the supervisor.
+The severity of the drop in retrieval accuracy across our unsupervised experiments made a rigorous diagnostic phase unavoidable. When an optimisation algorithm fails to converge on a meaningful semantic mapping, the failure usually traces back to one of three sources: a bug somewhere in the implementation, an unstable hyperparameter configuration, or a genuine incompatibility in the underlying mathematical assumptions of the data itself. To figure out which, we designed and ran an exhaustive ablation study spanning thirteen distinct experimental configurations, deliberately challenging every variable in the pipeline in turn, so that any poor GW performance we observed could be trusted as a genuine reflection of the latent space topologies rather than a technical oversight we'd overlooked. Tests 1 through 11 cover the standard algorithmic ground; Tests 12 and 13, added on the supervisor's specific instructions, dig into advanced methodological questions around feature preprocessing and entropic smoothing.
 
 \subsection{Implementation Validation (Tests 1 and 2)}
 \label{subsec:implementation_validation}
 
-Before questioning the complex geometry of the Objaverse dataset, it was
-imperative to guarantee that our custom Optimal Transport solvers,
-particularly the Low-Rank Gromov-Wasserstein (LR-GW) implementation via
-OTT-JAX, were structurally sound.
+Before questioning the geometry of the Objaverse dataset itself, we first had to be sure our custom Optimal Transport solvers --- the Low-Rank Gromov-Wasserstein (LR-GW) implementation via OTT-JAX in particular --- were structurally sound.
 
 \paragraph{Test 1: Synthetic Sanity Check.}
-We constructed synthetic data scenarios where the optimal alignment was
-mathematically guaranteed to exist. We defined a target space $Y = XQ$,
-where $Q$ is a random orthogonal matrix representing a perfect geometric
-isometry (a rotation in high-dimensional space). Operating with $n=500$,
-$d=50$, and a rank constraint of 200, the LR-GW solver perfectly recovered
-the mapping, achieving a $93.4\%$ Top-5 accuracy on the rotated data and
-$91.6\%$ on reflected data ($Y = X$ with a sign flip). Conversely, when
-attempting to map the space onto pure independent Gaussian noise, performance
-immediately collapsed to a random-guessing baseline of $1.6\%$. This test
-definitively proved that the solver is capable of finding isometric alignments
-when they genuinely exist in the underlying data.
+We built synthetic scenarios where the correct alignment was mathematically guaranteed to exist. We defined a target space $Y = XQ$, with $Q$ a random orthogonal matrix representing a perfect geometric isometry (a rotation in high-dimensional space). Running with $n=500$, $d=50$, a rank constraint of 200, and $\epsilon=0.1$, the \gls{lrgw} solver recovered the mapping perfectly --- $93.4\%$ Top-5 accuracy on the rotated data, $91.6\%$ on reflected data ($Y = X$ with a sign flip).
+
+Interestingly, Case C --- a rotation corrupted by moderate Gaussian noise, $Y = XQ + \mathcal{N}(0, 0.1)$ --- also collapsed to near-random performance ($1.8\%$ Top-5), even though the underlying isometric structure was still technically present. That's not just a negative control result: it tells us the \gls{lrgw} solver is quite sensitive to even modest perturbations of an otherwise perfectly isometric mapping, and doesn't only fail in the total absence of structure. When we mapped onto pure independent Gaussian noise instead (Case D), performance dropped to a random-guessing baseline of $1.6\%$, as expected.
+
+Taken together, Cases C and D suggest the solver's ability to recover isometric structure is fairly fragile, which raises a question: could the failure on real 3D-text data (Section~\ref{sec:gw_results}) reflect not a genuine absence of isometry, but a substantial degree of non-isometric noise sitting on top of a weaker real signal? We tackle that distinction directly through the self-GW and CKA-based analysis of Section~\ref{sec:why_gw_fails}. What this test does establish definitively, though, is that the solver \emph{is} capable of finding isometric alignments when they're cleanly present (Cases A--B).
 
 \begin{table}[htpb]
 \centering
@@ -295,23 +174,16 @@ C -- Rotation+Noise & $Y = XQ + \mathcal{N}(0, 0.1)$ &  1.0 &  1.8 \\
 D -- Pure Noise     & $Y$ independent Gaussian        &  0.6 &  1.6 \\
 \bottomrule
 \end{tabular}
-\caption{Sanity check (Test 1), LR-GW ($r=200$) on synthetic data.
-Cases A--B confirm the solver recovers true isometric mappings.
-Case D is the random-guessing baseline.}
+\caption{Sanity check (Test 1), LR-GW ($n=500$, $d=50$, $r=200$,
+$\epsilon=0.1$) on synthetic data. Cases A--B confirm the solver recovers
+true isometric mappings. Case C shows the solver's sensitivity to moderate
+perturbations of an isometric mapping. Case D is the random-guessing
+baseline.}
 \label{tab:sanity_check}
 \end{table}
 
 \paragraph{Test 2: Self-GW on Real Features.}
-To ensure the Objaverse features themselves did not contain numerical
-anomalies preventing OT convergence, we tasked the solver with the trivial
-objective of aligning a modality with itself. We computed the $\mathcal{GW}$
-distance between the PointNet features and themselves, and identically for
-the CLIP features. The algorithm achieved $86.6\%$ Top-5 retrieval for
-self-aligned PointNet and $88.0\%$ Top-5 for self-aligned CLIP. Notably,
-the structural cost of aligning the two distinct spaces (PointNet to CLIP)
-was $1.4\times$ higher than the cost of aligning identical spaces. These
-initial tests confirm the implementation is correct; the failure resides
-within the cross-modal data topology.
+Next, to rule out any numerical quirks lurking in the Objaverse features themselves, we gave the solver the trivial task of aligning a modality with itself. Working on \gls{cca}-projected features ($k=50$, consistent with our main protocol) at rank $r=200$ --- the same solver settings as Test 1 --- we computed the $\mathcal{GW}$ distance between the PointNet features and themselves, and did the same for \gls{clip}. The algorithm hit $86.6\%$ Top-5 for self-aligned PointNet and $88.0\%$ for self-aligned \gls{clip}. The structural cost of aligning the two distinct spaces (PointNet to CLIP, $0.0332$) came out $1.4\times$ higher than aligning identical spaces, and lines up reasonably well with the post-\gls{cca} \gls{gw} cost reported for this pair in the diagnostic analysis of Section~\ref{sec:why_gw_fails} (Table~\ref{tab:gw-diagnostic}, $0.031$); the small remaining gap just reflects the specific sample subset used for this rank-200 sanity check versus the full diagnostic sweep. Between this and Test 1, the implementation checks out --- the failure is happening in the cross-modal data topology itself, not our code.
 
 \begin{table}[htpb]
 \centering
@@ -325,128 +197,85 @@ GW(CLIP, CLIP) -- self         & 0.0242 & 71.2 & 88.0 \\
 GW(PointNet, CLIP) -- real     & 0.0332 &  0.2 &  0.6 \\
 \bottomrule
 \end{tabular}
-\caption{Self-GW validation (Test 2), rank=200. The structural cost of
-aligning distinct modalities (0.0332) is $1.4\times$ higher than
-self-alignment, quantifying the geometric incompatibility of the spaces.}
+\caption{Self-GW validation (Test 2), CCA-projected features ($k=50$),
+rank$=200$. The structural cost of aligning distinct modalities (0.0332)
+is $1.4\times$ higher than self-alignment, quantifying the geometric
+incompatibility of the spaces.}
 \label{tab:self_gw}
 \end{table}
 
 \subsection{Hyperparameter and Metric Sweeps (Tests 3 to 6)}
 \label{subsec:hyperparameter_sweeps}
 
-Having validated the codebase, we turned our attention to the optimisation
-dynamics. The $\mathcal{GW}$ loss landscape is highly non-convex, and
-gradient-based solvers can easily become trapped in localised topological
-artefacts if not properly regularised.
+With the codebase validated, we turned to the optimisation dynamics themselves. The $\mathcal{GW}$ loss landscape is highly non-convex, and gradient-based solvers can get stuck in localised topological traps fairly easily if regularisation isn't tuned well.
 
 \paragraph{Test 3: Epsilon Regularisation Sweep.}
-Entropic regularisation ($\epsilon$) dictates the smoothness of the transport
-plan. We conducted a sweep across eight distinct values
-($\epsilon \in \{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0\}$) using
-rank 20 and cosine cost. The solver returned an identical final GW cost of
-$0.0392$ across all eight configurations. This indicates that the algorithm
-converges to the exact same stationary point regardless of the regularisation
-strength, suggesting the absence of better local minima in the loss landscape.
+Entropic regularisation ($\epsilon$) controls how smooth the transport plan is. We swept eight values ($\epsilon \in \{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0\}$) at rank 20 with cosine cost, and the solver returned an identical final \gls{gw} cost of $0.0392$ across all eight. In other words, the algorithm converges to exactly the same stationary point no matter how strong or weak the regularisation is --- there simply isn't a better local minimum sitting somewhere in the landscape for a different $\epsilon$ to find.
 
 \paragraph{Test 4: Cost Function Formulation.}
-The geometry of high-dimensional neural representations often behaves
-counter-intuitively under standard Euclidean norms. We replaced the default
-squared-Euclidean distance with an angular distance metric
-$d(x, x') = \arccos\!\left(\tfrac{x \cdot x'}{\|x\|\,\|x'\|}\right)$,
-following the formulations of Li et al.~\cite{li2026}. While the angular
-metric improved the Top-5 accuracy slightly from $0.4\%$ to $1.9\%$, the
-result remained roughly $18\times$ below the supervised CCA+Affine baseline
-\cite{hadgi2025}. The choice of distance function is not the limiting factor.
+High-dimensional neural representations don't always behave intuitively under standard Euclidean norms. We swapped the default squared-Euclidean distance (OTT-JAX's default) for an angular distance metric $d(x, x') = \arccos\!\left(\tfrac{x \cdot x'}{\|x\|\,\|x'\|}\right)$, following Li et al.~\cite{li2026scale}. The angular metric bumped Top-5 accuracy from $0.4\%$ to $1.9\%$ --- a real improvement, but a modest one, still roughly $18\times$ below the supervised \gls{cca}+Affine baseline \cite{hadgi2025escaping}. The distance function isn't what's holding things back.
 
 \paragraph{Test 5: Raw Features and Scale-Matching.}
-We investigated whether normalisation techniques were at fault. Applying
-LR-GW directly on raw, pre-CCA normalised features, we incorporated the
-median-ratio scale correction $s = \text{med}(D_Y)/\text{med}(D_X)$ of
-Li et al.~\cite{li2026} to adjust for modal density differences. This
-attempt yielded a dismal $0.5\%$ Top-5 accuracy, confirming that simple
-scale discrepancies are not the core issue.
+Next we checked whether normalisation was somehow the culprit. Running LR-GW directly on raw, pre-\gls{cca} normalised features, we applied Li et al.'s median-ratio scale correction $s = \text{med}(D_Y)/\text{med}(D_X)$ (Eq.~3 \cite{li2026scale}) to adjust for the mismatch in modal density. The result --- a dismal $0.5\%$ Top-5, corrected or not --- rules out simple scale discrepancies as the core issue.
 
 \paragraph{Test 6: Rank Constraint Sweep.}
-We aggressively swept the rank parameter across seven values:
-$r \in \{2, 5, 10, 20, 50, 100, 200\}$. The optimal performance peaked at
-rank 50, generating a Top-5 accuracy of $2.4\%$. In the synthetic Test 1,
-raising the rank to 200 drastically improved accuracy (from $19\%$ to
-$93\%$); on real data, no such improvement occurred. This proves the
-bottleneck is not the model's representational capacity, but the structural
-incompatibility of the data itself.
+We aggressively swept the rank parameter across seven values, $r \in \{2, 5, 10, 20, 50, 100, 200\}$. Performance peaked at rank 50, hitting $2.4\%$ Top-5. In the synthetic Test 1, pushing rank from 20 to 200 improved Case A dramatically, from $19\%$ to $93\%$; nothing comparable happened on real data at any rank. The bottleneck clearly isn't the model's representational capacity --- it's the structural incompatibility of the data itself.
 
 \subsection{Dataset and Architecture Generalisation (Tests 7 to 9)}
 \label{subsec:dataset_generalization}
 
-We further examined whether the constraints of our dataset sampling or the
-specific architectures chosen were to blame for the alignment collapse.
+Next we checked whether our specific dataset sampling or architecture choices were somehow to blame for the collapse.
 
 \paragraph{Test 7: Query Set Expansion.}
-It was hypothesised that a query set of 500 pairs might not provide enough
-contextual density for the solver to orient the manifolds correctly. We
-scaled the query size to $n \in \{500, 1000, 2000\}$. The alignment
-performance did not improve with more data; in fact, it slightly degraded at
-the maximum size of 2000 queries, proving that data scarcity is not the
-limiting factor.
+Maybe a 500-pair query set just wasn't dense enough to help the solver orient the manifolds correctly? We tried $n \in \{500, 1000, 2000\}$. Performance didn't improve with more data --- it actually degraded slightly at $n=2000$ --- so data scarcity isn't the limiting factor either.
 
 \paragraph{Test 8: CCA Dimension Sweep.}
-We tested whether the CCA subspace size $k=50$ was discarding too much
-structural variance. We evaluated $k \in \{10, 20, 50, 100\}$. The best
-LR-GW result occurred at $k=20$, achieving $3.0\%$ Top-5. By comparison,
-the supervised CCA+Affine baseline evaluated in that exact same $k=20$
-subspace reached $30.1\%$. The massive performance gap persists consistently
-across all dimensionalities.
+Was the $k=50$ \gls{cca} subspace throwing away too much structural variance? We evaluated $k \in \{10, 20, 50, 100\}$. LR-GW's best result came at $k=20$, at $3.0\%$ Top-5, versus $30.1\%$ for the supervised \gls{cca}+Affine baseline in that same $k=20$ subspace. The gap holds up consistently across every dimensionality we tried.
 
 \paragraph{Test 9: Comprehensive Encoder Matrix.}
-To rule out a specific flaw in the PointNet or CLIP topologies, we repeated
-the standard LR-GW configuration across all six encoder combinations
-(PointNet and SparseConv against CLIP, RoBERTa, and BERT) across three
-independent seeds. The unsupervised retrieval metrics remained uniformly
-flat, hovering tightly between $1.1\%$ and $1.7\%$ Top-5 regardless of
-the encoder combination, conclusively demonstrating that the failure is an
-intrinsic property of cross-modal alignment rather than an encoder-specific
-anomaly.
+To rule out something specific to the PointNet or \gls{clip} topologies, we repeated the standard \gls{lrgw} configuration (rank$=20$, $\epsilon=0.1$, 3 seeds) across all six encoder combinations --- PointNet and SparseConv, each against \gls{clip}, \gls{roberta}, and \gls{bert}. The unsupervised retrieval metrics stayed flat, hovering between $1.1\%$ and $1.7\%$ Top-5 regardless of which encoders were paired. The supervised \gls{cca}+Affine baseline, by contrast, swings widely across the same six pairs, from $10.2\%$ to $34.1\%$ Top-5, tracking real quality differences between encoders --- differences that \gls{lrgw} is completely blind to. This closes the door on any encoder-specific explanation: the \gls{gw} failure is intrinsic to cross-modal alignment itself.
 
 \subsection{Library Consistency and Transport Plan Analysis (Tests 10 and 11)}
 \label{subsec:library_analysis}
 
 \paragraph{Test 10: Cross-Library Verification.}
-To mathematically insulate our findings from potential bugs hidden deep within
-a specific software ecosystem, we replicated the core experiments using the
-Python Optimal Transport (POT) library \cite{flamary2021pot}, which relies on
-fundamentally different numerical solvers than OTT-JAX. The Sliced
-Gromov-Wasserstein (SGW) implementation via POT generated a $3.4\%$ Top-5
-accuracy, confirming that two independent, state-of-the-art optimal transport
-libraries agree on the same magnitude of failure.
+To rule out a bug hiding somewhere in one particular software ecosystem, we reran the core experiments using the Python Optimal Transport (POT) library \cite{flamary2021pot} --- the library Vayer et al. and Li et al. used in their own work --- alongside OTT-JAX, on identical data.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Method / Library} & \textbf{Match (\%)} & \textbf{Top-5 (\%)} \\
+\midrule
+SGW --- POT (Vayer et al. library)      & 1.8 & 3.4 \\
+LR-GW --- OTT-JAX, angular cost         & 1.6 & 1.2 \\
+LR-GW --- OTT-JAX, Euclidean cost       & 0.4 & 1.2 \\
+CCA + Affine (reference)                & 12.0 & 33.2 \\
+\bottomrule
+\end{tabular}
+\caption{Cross-library verification (Test 10). Two independent, state-of-the-art
+optimal transport libraries agree on the same order-of-magnitude failure. The
+CCA+Affine reference value in this row reflects the specific companion run
+executed alongside this test (see the run-to-run variance note in
+Chapter~\ref{ch:baseline}).}
+\label{tab:cross_library}
+\end{table}
+
+The Sliced Gromov-Wasserstein (SGW) run via \gls{pot} came out at $3.4\%$ Top-5 --- confirming that two independent, state-of-the-art optimal transport libraries land on the same magnitude of failure, not just the same qualitative story.
 
 \paragraph{Test 11: Transport Plan Inspection.}
-We directly analysed the raw structure of the generated transport matrix $T$.
-A successful retrieval matrix heavily concentrates probabilistic mass along
-its diagonal. Our analysis revealed that the LR-GW transport plan's
-diagonal-to-uniform ratio languished between $0.4\times$ and $1.2\times$.
-Furthermore, its mathematical entropy was measured between $7.4$ and $9.6$
-(approaching the theoretical maximum of $\log(n^2) = 12.4$ for a fully
-uniform plan). This statistically proves that the matrix is
-indistinguishable from a uniform random distribution; the solver finds
-absolutely no semantic signal in the cross-modal structure.
+We then looked directly at the raw structure of the transport matrix $T$ itself. A genuinely useful retrieval matrix concentrates most of its probability mass along the diagonal. What we found: the \gls{lrgw} transport plan's diagonal-to-uniform ratio sat between $0.4\times$ and $1.2\times$. For comparison, the pseudo-transport matrix induced by the supervised \gls{cca}+Affine mapping --- built by shifting the cosine-similarity matrix to be non-negative and renormalising it to sum to one, since \gls{cca}+Affine doesn't produce a genuine doubly-stochastic coupling on its own --- shows a diagonal-to-uniform ratio of $1.6\times$, meaningfully above the uniform baseline of $1.0\times$.
+
+Worth being careful here: the raw entropy of this \gls{cca}+Affine pseudo-plan isn't directly comparable to that of a genuine transport plan. Cosine similarities between normalised embeddings vary within a fairly narrow numerical band across the \emph{entire} $n \times n$ matrix, so the resulting pseudo-plan looks globally near-flat in absolute value --- entropy $\approx 12.4$, close to the theoretical maximum $\log(n^2)$ --- even though the \emph{relative ranking} within each row, which is really all that Top-$K$ retrieval cares about, correctly favours the diagonal element. The \gls{lrgw} plan, by contrast, is a genuine Sinkhorn-derived coupling with much lower absolute entropy ($7.4$--$9.6$), reflecting real concentration of probability mass --- just concentrated on the \emph{wrong} cells, consistent with the many-to-one collapse discussed earlier. So the diagonal-to-uniform ratio ends up being the more informative and genuinely comparable statistic between the two methods, since it's normalised against the same $n^2$-cell baseline in both cases regardless of the underlying matrix's overall shape. By that measure, the supervised baseline shows real (if imperfect) structural concentration, while the unsupervised \gls{lrgw} solver simply doesn't.
 
 \subsection{Advanced Methodological Verifications (Tests 12 and 13)}
 \label{subsec:advanced_verifications}
 
-Following a preliminary review of Tests 1 through 11, two final experiments
-were designed following specific instructions from the supervisor to
-definitively close any remaining methodological loopholes.
+After reviewing Tests 1 through 11, two final experiments were designed on the supervisor's specific instructions, to close off any remaining methodological loopholes.
 
-\paragraph{Test 12: GW on Raw Features (Pre-CCA).}
-A valid methodological concern was that the CCA projection, trained
-explicitly on 30,000 anchor pairs, might linearly filter out complex
-structural geometries that the non-linear $\mathcal{GW}$ could have
-exploited. To test this, we applied the solver directly to the raw,
-unprojected PointNet (1024-dim) and CLIP (1280-dim) features, entirely
-bypassing CCA. LR-GW handles different input dimensions because it operates
-on $n \times n$ internal distance matrices, not on the feature vectors
-directly. We tested four normalisation variants to exclude any pre-processing
-artefact:
+\paragraph{Test 12: GW on Raw Features (Pre-CCA, Zero Supervision).}
+One reasonable objection to Tests 1--11 was that the \gls{cca} projection --- trained explicitly on 30,000 anchor pairs --- might be linearly filtering out complex structural geometries that the non-linear $\mathcal{GW}$ could otherwise have exploited. If that were true, \gls{gw} on the raw features might succeed exactly where post-\gls{cca} \gls{gw} fails. To test this, we ran the solver (rank$=20$, $\epsilon=0.1$, angular cost) directly on the raw, unprojected PointNet (1024-dim) and \gls{clip} (1280-dim) features --- no \gls{cca}, no affine map, no anchor information whatsoever. \gls{lrgw} handles the mismatched input dimensions fine because it operates on $n \times n$ internal distance matrices, not the feature vectors directly. We tested four normalisation variants ($n=500$, 3 seeds) to rule out any pre-processing artefact:
 
 \begin{table}[htpb]
 \centering
@@ -461,36 +290,18 @@ StandardScaler (zero-mean, unit-variance), no SM     & 0.5 & 1.3 \\
 StandardScaler + Li et al.\ scale-matching           & 0.6 & 1.5 \\
 \bottomrule
 \end{tabular}
-\caption{LR-GW on raw pre-CCA features (Test 12). All normalisation
-variants remain at or below random guessing ($\approx$1\%), proving the
-alignment failure is not an artefact of the CCA projection.}
+\caption{LR-GW on raw pre-CCA features (Test 12), $n=500$, 3 seeds. All
+normalisation variants remain at or below random guessing ($\approx$1\%),
+proving the alignment failure is not an artefact of the CCA projection.
+Scale factor $s = \text{med}(D_{\text{CLIP}})/\text{med}(D_{\text{PointNet}}) = 28.25$,
+per Li et al.'s Eq.~3.}
 \label{tab:raw_features_test}
 \end{table}
 
-All four variants yielded Top-5 accuracies between $1.3\%$ and $1.5\%$,
-statistically indistinguishable from random guessing. The scale factor
-$s = 28.25$ confirms that the two raw feature spaces operate on very
-different distance scales, yet even after correcting for this via
-scale-matching, performance does not improve. This conclusively proves
-that the supervised CCA step did not destroy exploitable structural
-information --- the structural isometry simply never existed in the raw
-features.
+All four variants landed between $1.3\%$ and $1.5\%$ Top-5, statistically indistinguishable from random guessing. The scale factor $s = 28.25$ confirms the two raw feature spaces really do operate on very different distance scales, but even correcting for that via scale-matching doesn't help. This settles the question raised earlier: the supervised \gls{cca} step wasn't destroying anything useful, because \gls{gw} fails just as badly on the raw features it never touched. The problem lives in the intrinsic geometry of the two latent spaces themselves, not in any preprocessing step along the way.
 
 \paragraph{Test 13: Fine Epsilon Sweep in the Low Range.}
-The final verification targeted the entropic smoothing factor. It was
-hypothesised that standard $\epsilon$ values might be excessively smoothing
-the landscape, masking a sharp, correct global minimum. We conducted a
-fine-grained sweep spanning three orders of magnitude in the
-near-unregularised regime:
-$\epsilon \in \{10^{-4}, 5 \cdot 10^{-4}, 10^{-3}, 5 \cdot 10^{-3},
-10^{-2}, 5 \cdot 10^{-2}, 10^{-1}\}$. The computed $\mathcal{GW}$ cost
-remained perfectly static at $0.0392$ (post-CCA) and $0.4854$ (pre-CCA)
-across all seven values, with zero variation up to four decimal places
-($\Delta\text{cost} = 0.0000$). Reducing the smoothing penalty from $0.1$
-to $0.0001$ had no effect on retrieval performance. This is the definitive
-computational signature of a mathematically flat loss landscape: the solver
-is not stuck due to excessive entropy, it converges to the same structural
-mapping because no better semantic alignment is geometrically possible.
+Finally, the supervisor asked for a fine-grained sweep in the low epsilon regime, where \gls{lrgw} gets close to exact, un-regularised optimal transport --- the idea being that if excessive entropic smoothing were responsible for the failure, very small epsilon values ought to reveal it. We tested seven values, $\epsilon \in \{10^{-4}, 5 \cdot 10^{-4}, 10^{-3}, 5 \cdot 10^{-3}, 10^{-2}, 5 \cdot 10^{-2}, 10^{-1}\}$, at rank $r=20$ (the same as Test 3) on PointNet$\times$\gls{clip}, both post-CCA ($k=50$, seed$=0$) and on the raw $L_2$-normalised features for direct comparison with Test 12. The $\mathcal{GW}$ cost stayed perfectly static at $0.0392$ (post-CCA, Top-5 $=1.2\%$) and $0.4854$ (pre-CCA, Top-5 $=1.6\%$) across all seven values, with zero variation down to four decimal places ($\Delta\text{cost} = 0.0000$). Dropping the smoothing penalty by three orders of magnitude, from $0.1$ to $0.0001$, changed nothing whatsoever about the cost or the retrieval performance. This is about as clear a computational signature of a flat loss landscape as you're going to get: the solver isn't stuck because of excessive entropy --- it's converging to the same structural mapping because no better semantic alignment exists geometrically, even in the near-unregularised regime.
 
 \begin{table}[H]
 \centering
@@ -504,7 +315,7 @@ mapping because no better semantic alignment is geometrically possible.
     & Implementation bug (93.4\% Top-5 on true isometry \checkmark) \\
 2  & Self-GW on real features
     & Data numerical issues (91.4\% match on self \checkmark) \\
-3  & $\epsilon$ sweep ($0.001$--$5.0$, 8 values)
+3  & $\epsilon$ sweep ($0.001$--$5.0$, 8 values, $r=20$)
     & Wrong regularisation (cost 0.0392 identical for all values) \\
 4  & Cost function (Euclidean vs.\ angular)
     & Wrong distance metric (angular: 1.9\%, $18\times$ below baseline) \\
@@ -517,11 +328,14 @@ mapping because no better semantic alignment is geometrically possible.
 8  & CCA dimension ($k \in \{10 \ldots 100\}$)
     & Wrong subspace (best $k$=20 gives 3.0\% vs.\ 30.1\% for CCA+Affine) \\
 9  & All 6 encoder pairs (3 seeds each)
-    & Encoder-specific artefact (1.1--1.7\% Top-5 uniformly) \\
+    & Encoder-specific artefact (1.1--1.7\% Top-5 uniformly, vs.\ 10.2--34.1\%
+      for CCA+Affine) \\
 10 & POT vs.\ OTT-JAX libraries
     & Library bug (both independently agree on same failure) \\
 11 & Transport plan structure
-    & Hidden signal (plan entropy statistically identical to uniform random) \\
+    & Hidden signal (diagonal ratio 1.6$\times$ for the supervised baseline
+      vs.\ 0.4--1.2$\times$ for LR-GW; raw entropy not directly comparable
+      due to pseudo-plan construction) \\
 \midrule
 \multicolumn{3}{c}{\textit{Advanced verifications --- added following
 supervisor instructions}} \\
@@ -529,7 +343,7 @@ supervisor instructions}} \\
 12 & LR-GW on raw pre-CCA features (4 variants)
     & CCA filtering exploitable structure
       (pre-CCA identical to post-CCA at $\approx$1.5\%) \\
-13 & Fine $\epsilon$ sweep ($10^{-4}$--$10^{-1}$, 7 values)
+13 & Fine $\epsilon$ sweep ($10^{-4}$--$10^{-1}$, 7 values, $r=20$)
     & Excessive smoothing masking solution
       (cost perfectly stable to 4 decimal places) \\
 \bottomrule
@@ -544,57 +358,54 @@ explanation each one definitively rules out.}
 \section{Theoretical Analysis: Why GW Cannot Work}
 \label{sec:why_gw_fails}
 
-The exhaustive ablation study presented in Section~\ref{sec:ablation_study}
-systematically eliminated every conventional point of computational failure.
-With the implementation, hyperparameters, and libraries fully validated, the
-persistent inability of Gromov-Wasserstein to align 3D objects with textual
-descriptions must be attributed to a fundamental violation of the mathematical
-assumptions underlying the Optimal Transport framework.
+The ablation study in Section~\ref{sec:ablation_study} systematically eliminated every conventional point of computational failure. With implementation, hyperparameters, and libraries all validated, the persistent inability of Gromov-Wasserstein to align 3D objects with textual descriptions has to trace back to a fundamental violation of the mathematical assumptions underlying the Optimal Transport framework itself.
 
-This section formalises the theoretical reasons behind this collapse,
-contrasting the intrinsic topological mismatch of the latent spaces against
-the success of the supervised linear baseline.
+This section works out the theoretical reasons behind that collapse, setting the intrinsic topological mismatch of the latent spaces against the success of the supervised linear baseline.
 
 \subsection{The Absence of Structural Isometry}
 \label{subsec:isometry_bottleneck}
 
-The theoretical justification for employing the Gromov-Wasserstein distance
-is its ability to bypass heterogeneous coordinate systems by matching
-relational intra-modal distance matrices. However, a foundational theorem by
-Vayer et al.~\cite{vayer2019} proves that the GW distance between two spaces
-converges to a meaningful zero-cost minimum \textit{if and only if} those
-spaces are globally isometric --- meaning there exists a rigorous,
-distance-preserving bijection between their structures.
+The whole theoretical case for using the Gromov-Wasserstein distance rests on its ability to bypass heterogeneous coordinate systems by matching relational intra-modal distance matrices instead. But a foundational theorem from Vayer et al.~\cite{vayer2019optimal} proves that the \gls{gw} distance between two spaces converges to a meaningful zero-cost minimum \textit{if and only if} those spaces are globally isometric --- meaning there's a rigorous, distance-preserving bijection connecting their structures.
 
-Our empirical results definitively prove that the PointNet and CLIP latent
-spaces do not share an isometric topology. This is theoretically corroborated
-by Hadgi et al.~\cite{hadgi2025}, who evaluated the structural similarity of
-these unaligned spaces using Linear Centered Kernel Alignment (CKA). While
-standard functional vision-text models typically exhibit CKA scores between
-$0.30$ and $0.48$, the unaligned PointNet and CLIP spaces yielded a CKA
-score of just $0.12$, as reported in their Figure 2. This extremely low
-correlation quantifies a profound structural disconnect: uni-modal 3D
-encoders do not naturally converge to topological manifolds that mirror
-textual representations.
+Our empirical results make it clear that the PointNet and \gls{clip} latent spaces don't share an isometric topology. Hadgi et al.~\cite{hadgi2025escaping} back this up theoretically: they evaluated structural similarity between these unaligned spaces using Linear Centered Kernel Alignment (CKA), and while standard functional vision-text models typically land somewhere between $0.30$ and $0.48$ on that scale, the unaligned PointNet and \gls{clip} spaces scored just $0.12$ (their Figure 2) --- prompting the original authors to conclude outright that uni-modal 3D encoders don't converge to structures resembling text. That's a very low correlation, and it quantifies a genuinely deep structural disconnect.
 
-Furthermore, applying the methodology of Li et al.~\cite{li2026} --- who
-utilise GW strictly as a training-free thermometer for latent space
-compatibility rather than an alignment tool --- our encoders consistently
-converged to a GW cost of approximately $0.031$ to $0.032$ post-CCA.
-According to their validated metric, which correlates strongly with
-Vision-Language Model (VLM) downstream performance ($R^2 = 0.43$ across
-$60+$ full training runs), this cost threshold explicitly flags our feature
-spaces as an intrinsically low-compatibility setting. Without an underlying
-structural homology, the GW solver has no geometric signal to exploit,
-reducing the transport plan to a mathematically valid but semantically
-meaningless mapping.
+Applying Li et al.'s methodology~\cite{li2026scale} --- who use \gls{gw} as a training-free thermometer for latent space compatibility rather than as an alignment tool in its own right --- our encoders consistently converged to a \gls{gw} cost of around $0.031$ to $0.032$ post-CCA, at rank $r=200$ (matching the self-GW validation protocol of Test 2, Section~\ref{subsec:implementation_validation}). Don't confuse this with the \gls{gw} cost of $0.0392$ reported in Tests 3 and 13 (Sections~\ref{subsec:hyperparameter_sweeps} and \ref{subsec:advanced_verifications}) --- that number was computed at the much lower rank $r=20$ used for the entropic regularisation sweeps, and lower-rank solvers systematically settle on higher residual costs because of the coarser transport plan approximation they're forced into. Table~\ref{tab:gw-diagnostic} lays out this diagnostic breakdown across all six encoder pairs, and it's striking: raw, pre-normalisation metric scales are wildly incompatible --- scale factors range from $s \approx 0.09$ all the way to $s \approx 228{,}000$ --- yet every pair converges to essentially the same near-uninformative \gls{gw} cost ($\approx 0.031$--$0.032$) once projected into the shared \gls{cca} subspace.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Pair} & \textbf{GW raw} & \textbf{GW+SM} & \textbf{GW post-CCA} & \textbf{Scale $s$} \\
+\midrule
+PointNet $\times$ CLIP      & 0.487 & 0.172       & 0.031 & 28.2 \\
+PointNet $\times$ RoBERTa   & 0.001 & $\approx 0$ & 0.031 & 0.09 \\
+PointNet $\times$ BERT      & 0.002 & 0.002       & 0.031 & 0.74 \\
+SparseConv $\times$ CLIP    & 0.530 & 0.437       & 0.032 & 228{,}000 \\
+SparseConv $\times$ RoBERTa & $\approx 0$ & $\approx 0$ & 0.032 & 694 \\
+SparseConv $\times$ BERT    & 0.004 & 0.002       & 0.032 & 6{,}040 \\
+\bottomrule
+\end{tabular}
+\caption{GW distance as a diagnostic compatibility metric (inspired by
+Li et al.~\cite{li2026scale}), computed on raw features (GW raw), after
+scale-matching normalisation (GW+SM), and after \gls{cca} projection (\gls{gw}
+post-CCA), for all six encoder pairs, at rank $r=200$. Scale-matching is
+only impactful when $s \gg 1$; all pairs converge to a near-identical,
+uninformative cost once projected into the shared CCA subspace, regardless
+of their starting compatibility.}
+\label{tab:gw-diagnostic}
+\end{table}
+
+Li et al.'s validated metric correlates strongly with Vision-Language Model (VLM) downstream performance ($R^2 = 0.43$ across $60+$ full training runs), and by that yardstick, this cost threshold flags our feature spaces as intrinsically low-compatibility. With no underlying structural homology to work with, the \gls{gw} solver has nothing geometric to latch onto --- the transport plan it produces is mathematically valid, but semantically meaningless.
 
 \subsection{Final Method Ranking and The Necessity of Supervision}
 \label{subsec:necessity_supervision}
 
-The fundamental dichotomy between the successful linear baseline and the
-failed optimal transport solvers lies entirely in the exploitation of
-ground-truth correspondence.
+The fundamental split between the successful linear baseline and the failed optimal transport solvers comes down entirely to how each one exploits ground-truth correspondence. The affine map spends 100\% of its objective on anchor labels: it minimises $\|Rx + b - y\|^2$ directly over known pairs, with no structural term at all, and it doesn't need the two spaces to be geometrically similar to begin with. \gls{gw}, by contrast, has no access to labels whatsoever and can only exploit structural similarity --- which our thirteen tests and \gls{cka} analysis both show to be simply absent here.
+
+Note again that ``$n$'' below denotes the number of samples used to
+estimate intra-domain distance matrices for unsupervised methods, or the
+number of anchor pairs used for supervised/semi-supervised penalty terms
+--- not uniform cross-modal supervision across all rows.
 
 \begin{table}[H]
 \centering
@@ -605,7 +416,9 @@ ground-truth correspondence.
     & \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
 \midrule
 \multicolumn{6}{l}{\textit{Unsupervised Optimal Transport}} \\
-& Sliced GW ($k$=20, 5k anc.)       & 1.5\%  & 1.1\%  & 3.2\%           & 4.8\%  \\
+& Sliced GW ($k$=20, 5k)            & 1.5\%  & 1.1\%  & 3.2\%           & 4.8\%  \\
+\midrule
+\multicolumn{6}{l}{\textit{Semi-Supervised Optimal Transport}} \\
 & FGW ($\alpha$=0.2, 1k anc.)       & 3.6\%  & 3.6\%  & 4.4\%           & 5.4\%  \\
 \midrule
 \multicolumn{6}{l}{\textit{Supervised Linear}} \\
@@ -624,35 +437,18 @@ ground-truth correspondence.
 }
 \caption{Complete ranking of all tested alignment methods on PointNet
 $\times$ CLIP. Final Top-5 order: CCA+Affine (35.7\%) $>$ RML (27.2\%)
-$>$ KCCA (15.8\%) $>$ FGW (4.4\%) $>$ SGW (3.2\%) $\approx$ random
-($\approx$1.6\%). Supervised methods consistently and substantially
-outperform all unsupervised alternatives.
-CCA+Affine result taken from Table~\ref{tab:baseline_results}
+$>$ KCCA (15.8\%) $>$ FGW (4.4\%) $>$ SGW (3.2\%) $>$ random ($\approx$1\%).
+Supervised methods consistently and substantially outperform all
+unsupervised alternatives.
+CCA+Affine result taken from Table~\ref{tab:linear_baseline_results}
 (Chapter~\ref{ch:baseline}). KCCA and RML results from
-Chapter~\ref{ch:nonlinear}. All results: 30,000 anchor pairs,
-500 query points, $k=50$, averaged over 3 random seeds.}
+Chapter~\ref{ch:nonlinear}. All results: 500 query points, $k=50$,
+averaged over 3 random seeds.}
 \label{tab:final_ranking}
 \end{table}
 
-Why does the CCA + Affine pipeline succeed where GW fails? The affine mapping
-$T(x) = Rx + b$ strictly minimises the mathematical discrepancy between
-predefined semantic anchor pairs ($\|Rx + b - y\|^2$ directly over known
-pairs), completely overriding the natural global topology of the manifolds.
-It does not require the 3D space to inherently resemble the text space
-geometrically; it artificially forces the correlation through supervised
-constraints.
+So why does \gls{cca} + Affine succeed where \gls{gw} fails? The affine mapping $T(x) = Rx + b$ strictly minimises the mathematical discrepancy between predefined semantic anchor pairs, completely overriding the natural global topology of the manifolds --- it doesn't need the 3D space to resemble the text space geometrically at all, because it just forces the correlation through supervised constraints instead.
 
-Conversely, Gromov-Wasserstein operates blindly without labels. It can only
-exploit structural similarities, which, as demonstrated by the CKA scores and
-our thirteen ablation tests, are fundamentally absent between raw 3D
-coordinate representations and linguistic transformer embeddings.
+Gromov-Wasserstein, meanwhile, operates blind, with no labels to lean on. All it can exploit is structural similarity, and as the \gls{cka} scores and our thirteen ablation tests both make clear, that similarity is fundamentally absent between raw 3D coordinate representations and linguistic transformer embeddings.
 
-Attempting to bridge the semantic gap between non-isometric modalities using
-purely unsupervised structural alignment is a theoretical dead end. Explicit
-semantic supervision remains an absolute mathematical necessity for functional
-3D-to-text retrieval in these specific latent spaces. This conclusion is
-further reinforced by the non-linear supervised methods presented in
-Chapter~\ref{ch:nonlinear}: even the most expressive non-linear alternatives
-(RML at 27.2\%, KCCA at 15.8\%) fall short of the simple linear affine map
-(35.7\%), confirming that the performance ceiling in this problem is set by
-the quality of the supervision, not by the complexity of the alignment model.
+Trying to bridge the semantic gap between non-isometric modalities using purely unsupervised structural alignment turns out to be a genuine theoretical dead end. Explicit semantic supervision isn't optional here --- it's an absolute mathematical necessity for functional 3D-to-text retrieval in these specific latent spaces. The non-linear supervised methods of Chapter~\ref{ch:nonlinear} reinforce this further: even the most expressive non-linear alternatives (\gls{rml} at 27.2\%, \gls{kcca} at 15.8\%) still fall short of the simple linear affine map (35.7\%), which tells us the performance ceiling here is set by the quality of the supervision, not by how complex the alignment model is.

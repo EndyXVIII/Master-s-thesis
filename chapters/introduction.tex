@@ -4,48 +4,47 @@
 \section{Motivation and Context}
 \label{sec:motivation}
 
-In recent years, artificial intelligence has undergone a fundamental paradigm shift from uni-modal processing toward multimodal representation learning. Foundational vision-language models, most notably CLIP, have demonstrated that projecting disparate modalities, specifically two-dimensional (2D) images and natural language text, into a unified, continuous latent space yields highly versatile representations. This shared semantic space enables zero-shot classification, cross-modal retrieval, and text-guided visual synthesis, effectively bridging the gap between symbolic linguistic concepts and visual inputs.
+Artificial intelligence has spent the last several years moving away from uni-modal processing and toward representations that span multiple modalities at once. Foundational vision-language models, \gls{clip} chief among them, showed that projecting disparate modalities --- two-dimensional images and natural language text, in that case --- into a single, continuous latent space produces representations that are useful for far more than either modality alone. That shared semantic space is what makes zero-shot classification, cross-modal retrieval, and text-guided visual synthesis possible in the first place, bridging symbolic linguistic concepts and raw visual input.
 
-While multimodal alignment has achieved remarkable maturity in 2D visual domains, extending these principles to three-dimensional (3D) representations remains a critical frontier in artificial intelligence. The digital 3D domain encoded mathematically as point clouds, polygonal meshes, or volumetric voxel grids is fundamental to robotics, autonomous driving, augmented and virtual reality (AR/VR), and embodied AI. For intelligent agents to interact seamlessly with physical environments, they must possess a joint understanding that directly connects textual descriptions (e.g., \emph{"a wooden dining chair with curved legs"}) to corresponding 3D geometric structures.
+Three-dimensional representation, though, hasn't caught up. Multimodal alignment is fairly mature in 2D vision, but extending the same ideas into 3D --- point clouds, polygonal meshes, volumetric voxel grids --- remains a genuinely open problem, and one that matters: robotics, autonomous driving, \gls{arvr}, and embodied AI all depend on it. An intelligent agent trying to act in the physical world needs to connect a phrase like \emph{"a wooden dining chair with curved legs"} to the actual geometric structure it refers to, not just recognise the words.
 
-However, aligning 3D representation spaces with natural language latent spaces presents significant mathematical and computational challenges:
+Aligning 3D representations with natural language turns out to be genuinely harder than the 2D case, for two fairly distinct reasons:
 \begin{itemize}
-    \item \textbf{Geometric Dissimilarity:} Unlike 2D images, which are structured as regular pixel grids that align naturally with sequence-based text tokens, 3D representations are inherently non-Euclidean, sparse, permutation-invariant, and complex in topological structure.
-    \item \textbf{Data Scarcity:} While 2D vision-language models leverage billions of web-scraped image-text pairs, high-quality paired 3D-text datasets remain orders of magnitude smaller. Joint end-to-end multimodal pre-training from scratch on 3D data is therefore computationally prohibitive and constrained by data availability.
+    \item \textbf{Geometric Dissimilarity:} 2D images are regular pixel grids, which line up naturally with sequence-based text tokens. 3D representations don't offer anything like that regularity --- they're non-Euclidean, sparse, permutation-invariant, and topologically messy.
+    \item \textbf{Data Scarcity:} 2D vision-language models are trained on billions of scraped image-text pairs. Nothing close to that scale exists for paired 3D-text data, which rules out joint end-to-end multimodal pre-training from scratch as a practical option.
 \end{itemize}
 
-To bypass the need for massive joint pre-training, recent research has explored \emph{a posteriori} cross-modal alignment. Rather than training multimodal architectures end-to-end, this strategy investigates whether independently trained, uni-modal 3D encoders (such as PointNet and SparseConv) and pre-trained language models (such as OpenCLIP, RoBERTa, and BERT) naturally build topological structures that share a common underlying geometry. As investigated by \textcite{hadgi2025escaping} in their seminal work \emph{"Escaping Plato's Cave"}, if independently trained uni-modal spaces capture shared real-world concepts, post-hoc mathematical projections---such as Canonical Correlation Analysis (CCA) and affine mappings---can align these latent spaces without requiring joint retraining.
+One way around the need for massive joint pre-training is \emph{a posteriori} cross-modal alignment: instead of training multimodal architectures end-to-end, this line of work asks whether independently trained, uni-modal 3D encoders (PointNet, SparseConv) and pre-trained language models (OpenCLIP, \gls{roberta}, \gls{bert}) already build topological structures that happen to share a common geometry. \textcite{hadgi2025escaping}, in \emph{"Escaping Plato's Cave"}, made the case that if independently trained uni-modal spaces do capture shared real-world concepts, then post-hoc mathematical projections --- \gls{cca} and affine mappings, specifically --- should be able to align them, with no joint retraining required.
 
-Understanding the mechanics, capacity, and fundamental limits of post-hoc 3D-text latent alignment forms the primary motivation of this thesis. Evaluating how effectively uni-modal spaces can be aligned---both via supervised linear projections and through unsupervised relational frameworks such as Optimal Transport---provides crucial theoretical and practical insights into whether geometric 3D shapes and natural language inherently share an intrinsic semantic geometry.
+That's the question this thesis is really built around: what are the mechanics, the capacity, and the fundamental limits of post-hoc 3D-text alignment? Comparing how well uni-modal spaces can be aligned --- through supervised linear projections on one hand, and unsupervised relational frameworks like \gls{ot} on the other --- should tell us something meaningful about whether 3D shapes and natural language actually share an intrinsic semantic geometry, or whether any apparent alignment is an artefact of supervision.
 
 \section{Problem Statement}
 \label{sec:problem_statement}
 
-Although significant progress has been made in post-hoc multimodal alignment in recent years, finding a reliable way to map uni-modal 3D representations to natural language still remains an unsolved research problem. Whereas baseline vision-language models are pre-trained using joint contrastive training on massive datasets, post-hoc alignment seeks to map independently trained latent spaces without any modification to the underlying backbone encoders. Despite the existence of some pioneering post-hoc alignment research, there are still two fundamental and unresolved challenges in this domain:
+Post-hoc multimodal alignment has come a long way, but a reliable way of mapping uni-modal 3D representations onto natural language is still, honestly, unsolved. Standard vision-language models get around this by training jointly and contrastively on massive paired datasets from the start; post-hoc alignment instead tries to map latent spaces that were trained completely independently, without touching the underlying backbone encoders at all. Even with some pioneering work already in this space, two fundamental questions remain wide open:
 
 \begin{enumerate}
 
-\item \textbf{The Curse of Paired Supervision:} The basic framework laid out in \textcite{hadgi2025escaping} illustrates that by using supervised linear projections such as canonical correlation analysis (CCA) followed by an affine transformation, one can extract shared structures between 3D and text representations. However, the method used by the authors of the above paper requires thousands of explicitly paired anchors, which brings forth a crucial research question: How much of the semantic alignment found is an intrinsic property of the independently learned latent spaces and how much is an artificial outcome enforced by supervision?
+\item \textbf{The Curse of Paired Supervision:} \textcite{hadgi2025escaping}'s framework shows that supervised linear projections --- \gls{cca} followed by an affine transformation --- can extract shared structure between 3D and text representations. But their method needs thousands of explicitly paired anchors to do it, which raises an obvious question: how much of that alignment reflects something genuinely intrinsic to the independently learned latent spaces, and how much is simply forced into existence by the supervision itself?
 
-\item \textbf{The Effectiveness of Relational Unsupervised Alignment:} Optimal transport (OT) in its Gromov-Wasserstein (GW) formulation theoretically provides a framework to align two metric spaces using only their intra-domain relation structure and without any pair-wise supervision. Although GW approaches have been successful in the domain of graph matching and 2D vision-language alignment, their performance on high-dimensional and complex 3D-text latent spaces has not yet been studied and is left as an open research question.
+\item \textbf{The Effectiveness of Relational Unsupervised Alignment:} \gls{ot}, in its \gls{gw} formulation, is supposed to align two metric spaces using nothing but their intra-domain relational structure --- no pairwise supervision at all, in theory. \gls{gw} has had real success in graph matching and 2D vision-language alignment, but nobody has actually tested whether that success carries over to high-dimensional, complex 3D-text latent spaces. That's still an open question.
 
 \end{enumerate}
 
-To address the above mentioned open research challenges, this thesis explores the theoretical and empirical limits of using both supervised linear projections and unsupervised relational optimal transport methods for 3D-text cross-modal alignment.
+This thesis takes on both of these directly, exploring the theoretical and empirical limits of supervised linear projections and unsupervised relational optimal transport for 3D-text cross-modal alignment.
 
 \subsection{Research Questions}
 
 \label{subsec:research_questions}
 
-This thesis attempts to answer the following three research questions:
+Three research questions run through the rest of this thesis:
 
 \begin{itemize}
 
-\item \textbf{RQ1 (Supervised Baseline Validation):} How well do the supervised linear projections (CCA with affine transformations) of a 3D point cloud embedding space align with various natural language latent spaces (e.g., generated by CLIP, RoBERTa, BERT)?
+\item \textbf{RQ1 (Supervised Baseline Validation):} how well do supervised linear projections (\gls{cca} with affine transformations) of a 3D point cloud embedding space align with various natural language latent spaces --- \gls{clip}, \gls{roberta}, \gls{bert}?
 
-\item \textbf{RQ2 (Feasibility of Unsupervised Optimal Transport):} Can unsupervised or weakly-supervised Gromov-Wasserstein-based methods (e.g., Sliced GW, Rotation-Invariant SGW, Fused GW, Low-Rank GW) learn a valid alignment between the 3D and text latent spaces without requiring any explicit pairs of anchors?
-
-\item \textbf{RQ3 (Theoretical and Topological Analysis):} If unsupervised relational optimal transport fails to achieve significant cross-modal alignment, what mathematical properties of the latent spaces and/or transport mechanisms are responsible for this failure?
+\item \textbf{RQ2 (Feasibility of Unsupervised Optimal Transport):} can unsupervised or weakly-supervised Gromov-Wasserstein-based methods (\gls{sgw}, \gls{risgw}, \gls{ssrisgw}, \gls{fgw}, \gls{lrgw}) learn a valid alignment between 3D and text latent spaces without any explicit anchor pairs, or with only minimal anchor-based supervision?
+\item \textbf{RQ3 (Theoretical and Topological Analysis):} if unsupervised relational optimal transport does fail to achieve meaningful cross-modal alignment, what mathematical properties of the latent spaces --- or of the transport mechanisms themselves --- are responsible?
 
 \end{itemize}
 
@@ -53,17 +52,17 @@ This thesis attempts to answer the following three research questions:
 
 \label{subsec:thesis_scope}
 
-To provide satisfactory answers to the above research questions, this thesis outlines the following objectives:
+To actually answer those questions, this thesis pursues four concrete objectives:
 
 \begin{itemize}
 
-\item \textbf{Implement and Reproduce the Supervised Baseline:} We develop an end-to-end evaluation framework on a large dataset of paired 3D objects (Objaverse with captions from Cap3D) for reproducing and benchmarking the supervised linear mapping from \textcite{hadgi2025escaping} with multiple 3D and text encoder configurations.
+\item \textbf{Implement and Reproduce the Supervised Baseline:} build an end-to-end evaluation framework on a large paired 3D-object dataset (Objaverse, with Cap3D captions) to reproduce and benchmark \textcite{hadgi2025escaping}'s supervised linear mapping across multiple 3D and text encoder configurations.
 
-\item \textbf{Develop and Deploy Unsupervised OT Algorithms:} We implement and evaluate five different Gromov-Wasserstein variants (Sliced GW, Rotation-Invariant SGW, Semi-Supervised RISGW, Fused GW and Low-Rank GW) combined with scale-matching normalizations from \textcite{li2026scale}.
+\item \textbf{Develop and Deploy Unsupervised OT Algorithms:} implement and evaluate five Gromov-Wasserstein variants (\gls{sgw}, \gls{risgw}, \gls{ssrisgw}, \gls{fgw} and \gls{lrgw}), combined with the scale-matching normalisations proposed by \textcite{li2026scale}.
 
-\item \textbf{Conduct Exhaustive Ablation Studies:} We systematically investigate hyperparameter ranges and feature space effects (e.g. with and without projections, and impact of subspace dimensions and regularization terms) across our developed pipeline to isolate potential computational and performance bottlenecks.
+\item \textbf{Conduct Exhaustive Ablation Studies:} systematically probe hyperparameter ranges and feature-space effects --- with and without projections, subspace dimensionality, regularisation strength --- to isolate where computational and performance bottlenecks actually come from.
 
-\item \textbf{Prove Theoretical Bounds:} We provide theoretical justifications for successful and failed unsupervised alignment through an in-depth analysis of domain-specific metric distribution properties, CKA similarity of the structural information contained within features and transport plan entropies.
+\item \textbf{Prove Theoretical Bounds:} work out theoretical justifications for why unsupervised alignment succeeds or fails, through a detailed look at domain-specific metric distribution properties, \gls{cka} structural similarity, and transport plan entropy.
 
 \end{itemize}
 
@@ -72,27 +71,25 @@ To provide satisfactory answers to the above research questions, this thesis out
 \section{Contributions}
 \label{sec:contributions}
 
-This thesis provides the following technical, empirical and theoretical contributions to cross-modal representation learning and 3D-text latent alignment.
+This thesis makes the following technical, empirical, and theoretical contributions to cross-modal representation learning and 3D-text latent alignment.
 
 \subsection{Key Contributions}
 
 \label{subsec:contributions}
 
-The main contributions of this work are summarised as follows:
-
 \begin{itemize}
 
-\item \textbf{Faithful Replication and Benchmarking of Supervised Linear Alignment:} We deploy an end-to-end feature extraction and alignment pipeline on $46{,}675$ paired 3D objects from the Objaverse dataset with Cap3D captions. We faithfully replicate the SVD-based Canonical Correlation Analysis (CCA) and affine alignment baseline proposed by \textcite{hadgi2025escaping} across six different encoder combinations (PointNet and SparseConv paired with OpenCLIP, RoBERTa, and BERT), establishing a robust evaluation benchmark ($35.7\%$ Top-5 retrieval for PointNet $\times$ OpenCLIP).
-    \item \textbf{Exhaustive Evaluation of Optimal Transport Frameworks:} We implement and benchmark five distinct Gromov-Wasserstein (GW) Optimal Transport variants---Sliced GW (SGW), Rotation-Invariant SGW (RISGW), Semi-Supervised RISGW (SS-RISGW), Fused GW (FGW), and Low-Rank GW (LR-GW via OTT-JAX)---incorporating the scale-matching normalization proposed by \textcite{li2026scale}. Through an exhaustive grid search and thirteen independent ablation experiments, we systematically prove that unsupervised GW methods fail ($\le 4.4\%$ Top-5) to align 3D and text latent spaces.
+\item \textbf{Faithful Replication and Benchmarking of Supervised Linear Alignment:} we build an end-to-end feature extraction and alignment pipeline covering $46{,}675$ paired 3D objects from Objaverse with Cap3D captions, faithfully replicating \textcite{hadgi2025escaping}'s \gls{svd}-based \gls{cca} and affine alignment baseline across six encoder combinations (PointNet and SparseConv, each paired with OpenCLIP, \gls{roberta}, and \gls{bert}). This establishes a solid evaluation benchmark, peaking at $35.7\%$ Top-5 retrieval for PointNet $\times$ OpenCLIP.
+    \item \textbf{Exhaustive Evaluation of Optimal Transport Frameworks:} we implement and benchmark five \gls{gw}-based \gls{ot} variants --- \gls{sgw}, \gls{risgw}, \gls{ssrisgw}, \gls{fgw}, and \gls{lrgw} via OTT-JAX --- incorporating \textcite{li2026scale}'s scale-matching normalisation. An exhaustive grid search plus thirteen independent ablation experiments together demonstrate, systematically rather than anecdotally, that unsupervised \gls{gw} methods top out at $4.4\%$ Top-5 --- nowhere near enough to align 3D and text latent spaces.
 \item \textbf{Exploration of Non-Linear Supervised Alignment Extensions:}
-As an original contribution beyond linear maps, we implement and evaluate
-two supervised non-linear alignment frameworks: Kernel CCA (KCCA) with
-Nystr\"{o}m kernel matrix approximation, which extends linear CCA to
-non-linear mappings via an RBF kernel; and Riemannian Metric Learning
-(RML), which learns a Mahalanobis distance metric via gradient descent
-on the Cholesky factor of a symmetric positive definite matrix, offering
-a flexible non-linear alternative to direct feature-space mapping.
-\item \textbf{Theoretical Proof of Structural Non-Isometry:} By analyzing transport plan entropy, mass concentration ratios, self-GW cost ratios, and unaligned CKA structural similarity scores (as reported by \textcite{hadgi2025escaping} in their Figure 2, $\approx 0.12$), we provide a theoretical proof explaining why unsupervised relational optimal transport fails. We demonstrate that uni-modal 3D point cloud latent spaces and text spaces fundamentally violate the assumption of \emph{structural isometry}, trapping quadratic optimal transport solvers in non-informative local minima.
+as an original contribution beyond linear mapping, we implement and evaluate
+two supervised non-linear alignment frameworks: \gls{kcca} with
+Nystr\"{o}m kernel matrix approximation, extending linear \gls{cca} into
+non-linear territory via an \gls{rbf} kernel; and \gls{rml}, which learns a
+Mahalanobis distance metric by gradient descent on the Cholesky factor of a
+\gls{spd} matrix --- a more flexible, non-linear alternative to mapping
+feature spaces directly.
+\item \textbf{Theoretical Proof of Structural Non-Isometry:} by analysing transport plan entropy, mass concentration ratios, self-\gls{gw} cost ratios, and unaligned \gls{cka} structural similarity scores (Hadgi et al.'s Figure 2 reports $\approx 0.12$ for this pair \cite{hadgi2025escaping}), we work out a theoretical explanation for why unsupervised relational optimal transport fails here. Uni-modal 3D point cloud latent spaces and text spaces, it turns out, fundamentally violate the assumption of \emph{structural isometry} --- and that's exactly what traps quadratic optimal transport solvers in non-informative local minima.
 
 \end{itemize}
 
@@ -100,38 +97,38 @@ a flexible non-linear alternative to direct feature-space mapping.
 \label{subsec:thesis_structure}
 
 
-The remainder of this thesis is organised as follows:
+The rest of this thesis is organised as follows:
 
 \begin{itemize}
     \item \textbf{Chapter \ref{ch:background} (Background and Related Work):}
-    Reviews the core theoretical foundations of 3D representation learning,
+    works through the core theoretical foundations --- 3D representation learning,
     multimodal vision-language models, Canonical Correlation Analysis, and
-    Optimal Transport theory (including Monge-Kantorovich formulations,
-    Wasserstein metrics, and Gromov-Wasserstein relational alignment).
+    Optimal Transport theory, from Monge-Kantorovich formulations and
+    Wasserstein metrics through to Gromov-Wasserstein relational alignment.
 
     \item \textbf{Chapter \ref{ch:experimental_setup} (Experimental Setup):}
-    Outlines the experimental methodology, dataset preparation (Objaverse and
-    Cap3D), backbone encoder architectures, high-performance computing cluster
-    setup, and cross-modal retrieval evaluation metrics.
+    covers the experimental methodology: dataset preparation (Objaverse and
+    Cap3D), backbone encoder architectures, the high-performance computing cluster
+    setup, and the cross-modal retrieval evaluation metrics used throughout.
 
     \item \textbf{Chapter \ref{ch:baseline} (Supervised Linear Baseline):}
-    Details the implementation, replication, and performance of the supervised
-    linear alignment pipeline (CCA and Affine transformations) across all six
+    details the implementation, replication, and performance of the supervised
+    linear alignment pipeline (\gls{cca} and affine transformations) across all six
     encoder combinations.
 
     \item \textbf{Chapter \ref{ch:nonlinear} (Non-Linear Alignment Methods):}
-    Presents two supervised non-linear extensions as original contributions:
-    Kernel CCA with Nystr\"{o}m approximation and Riemannian Metric Learning,
-    evaluated at full dataset scale and compared against the linear baseline.
+    presents the two supervised non-linear extensions --- Kernel \gls{cca} with
+    Nystr\"{o}m approximation and Riemannian Metric Learning --- evaluated at
+    full dataset scale and compared against the linear baseline.
 
     \item \textbf{Chapter \ref{ch:gw_alignment} (Gromov-Wasserstein Alignment
-    and Theoretical Analysis):} Investigates unsupervised relational Optimal
-    Transport formulations, presents thirteen diagnostic ablation experiments
-    across GW variants, and provides a theoretical non-isometry analysis
-    explaining the fundamental limits of relational OT.
+    and Theoretical Analysis):} investigates unsupervised relational Optimal
+    Transport formulations, walks through thirteen diagnostic ablation experiments
+    across \gls{gw} variants, and lays out a theoretical non-isometry analysis
+    explaining the fundamental limits of relational \gls{ot}.
 
     \item \textbf{Chapter \ref{ch:conclusions} (Conclusion and Future Work):}
-    Summarises the primary findings of the thesis, discusses the broader
-    implications for 3D multimodal alignment, and outlines promising directions
-    for future research.
+    pulls together the thesis's main findings, discusses what they mean for 3D
+    multimodal alignment more broadly, and outlines directions worth pursuing
+    next.
 \end{itemize}

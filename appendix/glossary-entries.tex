@@ -1,21 +1,299 @@
+% ============================================================================
 % Acronyms
-\newacronym[description={\glslink{apig}{Application Program Interface}}]
-    {api}{API}{Application Program Interface}
+% ============================================================================
 
-\newacronym[description={\glslink{umlg}{Unified Modeling Language}}]
-    {uml}{UML}{Unified Modeling Language}
+\newacronym[description={\glslink{ccag}{Canonical Correlation Analysis}}]
+    {cca}{CCA}{Canonical Correlation Analysis}
 
+\newacronym[description={\glslink{gwg}{Gromov-Wasserstein}}]
+    {gw}{GW}{Gromov-Wasserstein}
+
+\newacronym[description={\glslink{otg}{Optimal Transport}}]
+    {ot}{OT}{Optimal Transport}
+
+\newacronym[description={\glslink{sgwg}{Sliced Gromov-Wasserstein}}]
+    {sgw}{SGW}{Sliced Gromov-Wasserstein}
+
+\newacronym[description={\glslink{risgwg}{Rotation-Invariant Sliced Gromov-Wasserstein}}]
+    {risgw}{RISGW}{Rotation-Invariant Sliced Gromov-Wasserstein}
+
+\newacronym[description={\glslink{ssrisgwg}{Semi-Supervised Rotation-Invariant Sliced Gromov-Wasserstein}}]
+    {ssrisgw}{SS-RISGW}{Semi-Supervised Rotation-Invariant Sliced Gromov-Wasserstein}
+
+\newacronym[description={\glslink{fgwg}{Fused Gromov-Wasserstein}}]
+    {fgw}{FGW}{Fused Gromov-Wasserstein}
+
+\newacronym[description={\glslink{lrgwg}{Low-Rank Gromov-Wasserstein}}]
+    {lrgw}{LR-GW}{Low-Rank Gromov-Wasserstein}
+
+\newacronym[description={\glslink{kccag}{Kernel Canonical Correlation Analysis}}]
+    {kcca}{KCCA}{Kernel Canonical Correlation Analysis}
+
+\newacronym[description={\glslink{rmlg}{Riemannian Metric Learning}}]
+    {rml}{RML}{Riemannian Metric Learning}
+
+\newacronym[description={\glslink{cliqg}{Contrastive Language-Image Pre-training}}]
+    {clip}{CLIP}{Contrastive Language-Image Pre-training}
+
+\newacronym[description={\glslink{bertg}{Bidirectional Encoder Representations from Transformers}}]
+    {bert}{BERT}{Bidirectional Encoder Representations from Transformers}
+
+\newacronym[description={\glslink{robertag}{Robustly Optimized BERT Approach}}]
+    {roberta}{RoBERTa}{Robustly Optimized BERT Approach}
+
+\newacronym[description={\glslink{ckag}{Centered Kernel Alignment}}]
+    {cka}{CKA}{Centered Kernel Alignment}
+
+\newacronym[description={\glslink{rkhsg}{Reproducing Kernel Hilbert Space}}]
+    {rkhs}{RKHS}{Reproducing Kernel Hilbert Space}
+
+\newacronym[description={\glslink{rbfg}{Radial Basis Function}}]
+    {rbf}{RBF}{Radial Basis Function}
+
+\newacronym[description={\glslink{spdg}{Symmetric Positive Definite}}]
+    {spd}{SPD}{Symmetric Positive Definite}
+
+\newacronym[description={\glslink{svdg}{Singular Value Decomposition}}]
+    {svd}{SVD}{Singular Value Decomposition}
+
+\newacronym[description={\glslink{mlpg}{Multi-Layer Perceptron}}]
+    {mlp}{MLP}{Multi-Layer Perceptron}
+
+\newacronym[description={\glslink{vlmg}{Vision-Language Model}}]
+    {vlm}{VLM}{Vision-Language Model}
+
+\newacronym[description={\glslink{infonceg}{Information Noise-Contrastive Estimation}}]
+    {infonce}{InfoNCE}{Information Noise-Contrastive Estimation}
+
+\newacronym[description={\glslink{mlmg}{Masked Language Modeling}}]
+    {mlm}{MLM}{Masked Language Modeling}
+
+\newacronym[description={\glslink{nspg}{Next Sentence Prediction}}]
+    {nsp}{NSP}{Next Sentence Prediction}
+
+\newacronym[description={\glslink{hpcg}{High-Performance Computing}}]
+    {hpc}{HPC}{High-Performance Computing}
+
+\newacronym[description={\glslink{migg}{Multi-Instance GPU}}]
+    {mig}{MIG}{Multi-Instance GPU}
+
+\newacronym[description={\glslink{potg}{Python Optimal Transport}}]
+    {pot}{POT}{Python Optimal Transport}
+
+\newacronym[description={\glslink{jaxg}{JAX}}]
+    {jax}{JAX}{Google's autodiff and XLA acceleration library}
+
+\newacronym[description={\glslink{arvrg}{Augmented and Virtual Reality}}]
+    {arvr}{AR/VR}{Augmented and Virtual Reality}
+
+\newacronym[description={\glslink{rqg}{Research Question}}]
+    {rq}{RQ}{Research Question}
+
+
+% ============================================================================
 % Glossary entries
-\newglossaryentry{apig} {
-    name=\glslink{api}{API},
-    text=Application Program Interface,
-    sort=api,
-    description={in informatica con il termine \emph{Application Programming Interface API} (ing. interfaccia di programmazione di un'applicazione) si indica ogni insieme di procedure disponibili al programmatore, di solito raggruppate a formare un set di strumenti specifici per l'espletamento di un determinato compito all'interno di un certo programma. La finalità è ottenere un'astrazione, di solito tra l'hardware e il programmatore o tra software a basso e quello ad alto livello semplificando così il lavoro di programmazione}
+% ============================================================================
+
+
+\newglossaryentry{ccag} {
+    name=\glslink{cca}{CCA},
+    text=Canonical Correlation Analysis,
+    sort=canonical correlation analysis,
+    description={in multivariate statistics, \emph{Canonical Correlation Analysis} is a method that finds linear projections of two sets of variables into a shared subspace such that their cross-correlation is maximised. In this thesis it is used as the first stage of the supervised baseline pipeline, projecting 3D and text features into a common $k=50$ subspace prior to the application of an affine transformation}
 }
 
-\newglossaryentry{umlg} {
-    name=\glslink{uml}{UML},
-    text=UML,
-    sort=uml,
-    description={in ingegneria del software \emph{UML, Unified Modeling Language} (ing. linguaggio di modellazione unificato) è un linguaggio di modellazione e specifica basato sul paradigma object-oriented. L'\emph{UML} svolge un'importantissima funzione di ``lingua franca'' nella comunità della progettazione e programmazione a oggetti. Gran parte della letteratura di settore usa tale linguaggio per descrivere soluzioni analitiche e progettuali in modo sintetico e comprensibile a un vasto pubblico}
+\newglossaryentry{gwg} {
+    name=\glslink{gw}{GW},
+    text=Gromov-Wasserstein,
+    sort=gromov-wasserstein,
+    description={the \emph{Gromov-Wasserstein} distance is a formulation of Optimal Transport that aligns two metric spaces by comparing their intra-domain geometric structures (i.e., their pairwise distance matrices) rather than comparing feature coordinates directly. This distance equals zero if and only if the two spaces are perfectly isometric. In this thesis it is employed as the primary unsupervised alignment framework between 3D and text latent spaces}
+}
+
+\newglossaryentry{otg} {
+    name=\glslink{ot}{OT},
+    text=Optimal Transport,
+    sort=optimal transport,
+    description={\emph{Optimal Transport} is a mathematical framework for finding the most efficient way to transform one probability distribution into another, minimising a transport cost. Its relational variant, the Gromov-Wasserstein distance, constitutes the main unsupervised alignment tool investigated in this thesis}
+}
+
+\newglossaryentry{sgwg} {
+    name=\glslink{sgw}{SGW},
+    text=Sliced Gromov-Wasserstein,
+    sort=sliced gromov-wasserstein,
+    description={an accelerated variant of the Gromov-Wasserstein distance that projects high-dimensional spaces onto a set of random one-dimensional lines, drastically reducing the computational complexity of the original optimal transport problem}
+}
+
+\newglossaryentry{risgwg} {
+    name=\glslink{risgw}{RISGW},
+    text=Rotation-Invariant Sliced Gromov-Wasserstein,
+    sort=rotation-invariant sliced gromov-wasserstein,
+    description={an extension of Sliced Gromov-Wasserstein that explicitly optimises a rotation matrix on the Stiefel manifold to find the projection directions minimising the structural cost, making the method invariant to arbitrary rotations of the 3D space}
+}
+
+\newglossaryentry{ssrisgwg} {
+    name=\glslink{ssrisgw}{SS-RISGW},
+    text=Semi-Supervised Rotation-Invariant Sliced Gromov-Wasserstein,
+    sort=semi-supervised rotation-invariant sliced gromov-wasserstein,
+    description={a semi-supervised variant of RISGW that incorporates an anchor-based penalty term to weakly guide the optimisation of the rotation matrix towards semantically correct correspondences}
+}
+
+\newglossaryentry{fgwg} {
+    name=\glslink{fgw}{FGW},
+    text=Fused Gromov-Wasserstein,
+    sort=fused gromov-wasserstein,
+    description={a formulation that linearly interpolates, via a parameter $\alpha \in [0,1]$, between the standard optimal transport cost (based on direct feature distance) and the structural Gromov-Wasserstein cost, allowing the solver to jointly exploit direct feature similarities and overall geometric structure}
+}
+
+\newglossaryentry{lrgwg} {
+    name=\glslink{lrgw}{LR-GW},
+    text=Low-Rank Gromov-Wasserstein,
+    sort=low-rank gromov-wasserstein,
+    description={a variant of the Gromov-Wasserstein problem that factorises the transport plan matrix into a low-rank approximation of rank $r \ll n$, reducing spatial complexity from quadratic to linear and making the method viable on large-scale datasets}
+}
+
+\newglossaryentry{kccag} {
+    name=\glslink{kcca}{KCCA},
+    text=Kernel Canonical Correlation Analysis,
+    sort=kernel canonical correlation analysis,
+    description={a non-linear extension of Canonical Correlation Analysis that implicitly maps features into a Reproducing Kernel Hilbert Space via a kernel function, allowing the discovery of non-linear correlations between the two domains without explicitly computing the high-dimensional feature map}
+}
+
+\newglossaryentry{rmlg} {
+    name=\glslink{rml}{RML},
+    text=Riemannian Metric Learning,
+    sort=riemannian metric learning,
+    description={a supervised method that learns a Mahalanobis distance metric, parametrised by a symmetric positive definite matrix, so as to minimise the distance between known anchor pairs in a deformed geometric space, rather than learning an explicit mapping between the two domains}
+}
+
+\newglossaryentry{cliqg} {
+    name=\glslink{clip}{CLIP},
+    text=Contrastive Language-Image Pre-training,
+    sort=contrastive language-image pre-training,
+    description={an architecture that jointly trains a visual encoder and a text encoder via a symmetric contrastive loss over large collections of image-caption pairs, producing text representations intrinsically grounded in visual semantics. In this thesis, only the text encoder is used, in its open-source OpenCLIP variant}
+}
+
+\newglossaryentry{bertg} {
+    name=\glslink{bert}{BERT},
+    text=Bidirectional Encoder Representations from Transformers,
+    sort=bidirectional encoder representations from transformers,
+    description={a Transformer-based language model that pre-trains bidirectional representations via the Masked Language Modeling and Next Sentence Prediction objectives, used in this thesis as a purely linguistic text baseline with no exposure to visual or spatial data}
+}
+
+\newglossaryentry{robertag} {
+    name=\glslink{roberta}{RoBERTa},
+    text=Robustly Optimized BERT Approach,
+    sort=robustly optimized bert approach,
+    description={an optimised variant of BERT that removes the Next Sentence Prediction objective, adopts dynamic masking, and substantially scales up the training corpus and batch sizes, yielding more discriminative text representations while remaining free of visual exposure}
+}
+
+\newglossaryentry{ckag} {
+    name=\glslink{cka}{CKA},
+    text=Centered Kernel Alignment,
+    sort=centered kernel alignment,
+    description={a metric used to quantify the structural similarity between two representation spaces on a scale from 0 (unrelated) to 1 (identical). In this thesis it is invoked to corroborate the absence of structural isometry between unaligned 3D and text latent spaces}
+}
+
+\newglossaryentry{rkhsg} {
+    name=\glslink{rkhs}{RKHS},
+    text=Reproducing Kernel Hilbert Space,
+    sort=reproducing kernel hilbert space,
+    description={a (possibly infinite-dimensional) Hilbert space associated with a kernel function, into which Kernel CCA implicitly projects features in order to discover non-linear correlations between the two domains}
+}
+
+\newglossaryentry{rbfg} {
+    name=\glslink{rbf}{RBF},
+    text=Radial Basis Function,
+    sort=radial basis function,
+    description={a family of kernel functions whose value depends only on the distance between two points. In this thesis it is used as the kernel function in Kernel CCA, with bandwidth parameter $\gamma = 0.1$}
+}
+
+\newglossaryentry{spdg} {
+    name=\glslink{spd}{SPD},
+    text=Symmetric Positive Definite,
+    sort=symmetric positive definite,
+    description={a property of a symmetric matrix whose eigenvalues are all strictly positive. The Mahalanobis matrix learned by Riemannian Metric Learning is constrained to be symmetric positive definite via parametrisation on its Cholesky factor}
+}
+
+\newglossaryentry{svdg} {
+    name=\glslink{svd}{SVD},
+    text=Singular Value Decomposition,
+    sort=singular value decomposition,
+    description={a factorisation of a matrix into the product of three matrices that reveal its rank and variance structure. Employed as an efficient numerical implementation for computing Canonical Correlation Analysis at scale}
+}
+
+\newglossaryentry{mlpg} {
+    name=\glslink{mlp}{MLP},
+    text=Multi-Layer Perceptron,
+    sort=multi-layer perceptron,
+    description={a feed-forward neural network composed of fully connected layers, used as the building block of the PointNet encoder for extracting point-wise features from point clouds}
+}
+
+\newglossaryentry{vlmg} {
+    name=\glslink{vlm}{VLM},
+    text=Vision-Language Model,
+    sort=vision-language model,
+    description={a class of models jointly trained on visual and textual data. In this thesis the term is invoked in relation to the diagnostic metric of Li et al. (CVPR 2026), which correlates the Gromov-Wasserstein cost with the downstream performance of such models}
+}
+
+\newglossaryentry{infonceg} {
+    name=\glslink{infonce}{InfoNCE},
+    text=Information Noise-Contrastive Estimation,
+    sort=information noise-contrastive estimation,
+    description={a contrastive loss function that maximises the similarity between positive pairs (matching image-text) while minimising it against all negative pairs within a batch, underlying the training of CLIP}
+}
+
+\newglossaryentry{mlmg} {
+    name=\glslink{mlm}{MLM},
+    text=Masked Language Modeling,
+    sort=masked language modeling,
+    description={a pre-training objective in which a random portion of a text's tokens is masked and the model must predict their original value from the surrounding bidirectional context, underlying the training of BERT and RoBERTa}
+}
+
+\newglossaryentry{nspg} {
+    name=\glslink{nsp}{NSP},
+    text=Next Sentence Prediction,
+    sort=next sentence prediction,
+    description={a pre-training objective in which the model must determine whether a given pair of sentences is sequential in the original text. Present in BERT's original training but removed in RoBERTa}
+}
+
+\newglossaryentry{hpcg} {
+    name=\glslink{hpc}{HPC},
+    text=High-Performance Computing,
+    sort=high-performance computing,
+    description={a high-performance computing infrastructure composed of GPU/CPU clusters coordinated via a workload manager. In this thesis, computation was carried out on the University of Padova's \texttt{labsrv7} cluster, managed via Slurm}
+}
+
+\newglossaryentry{migg} {
+    name=\glslink{mig}{MIG},
+    text=Multi-Instance GPU,
+    sort=multi-instance gpu,
+    description={an NVIDIA technology that partitions a single physical GPU (in this thesis, a 20GB NVIDIA A100) into multiple isolated instances, each usable as an independent GPU for parallel workloads}
+}
+
+\newglossaryentry{potg} {
+    name=\glslink{pot}{POT},
+    text=Python Optimal Transport,
+    sort=python optimal transport,
+    description={the reference Python library for solving optimal transport problems, used in this thesis for the cross-library verification of Gromov-Wasserstein results obtained via OTT-JAX}
+}
+
+\newglossaryentry{jaxg} {
+    name=\glslink{jax}{JAX},
+    text=JAX,
+    sort=jax,
+    description={a library developed by Google for high-performance differentiable numerical computing, based on XLA compilation and hardware acceleration. In this thesis it underpins the OTT-JAX library used for the Low-Rank Gromov-Wasserstein solver}
+}
+
+\newglossaryentry{arvrg} {
+    name=\glslink{arvr}{AR/VR},
+    text=Augmented and Virtual Reality,
+    sort=augmented and virtual reality,
+    description={augmented and virtual reality technologies, cited as one of the application domains motivating the need for reliable alignment between 3D geometric representations and textual descriptions}
+}
+
+\newglossaryentry{rqg} {
+    name=\glslink{rq}{RQ},
+    text=Research Question,
+    sort=research question,
+    description={abbreviation used in this thesis to identify the three research questions (RQ1, RQ2, RQ3) formulated in Chapter 1 and addressed respectively by the supervised baseline, the unsupervised Optimal Transport methods, and the theoretical analysis of structural non-isometry}
 }

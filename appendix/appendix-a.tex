@@ -1,2 +1,236 @@
 \chapter{Appendix A}
+\label{app:appendix_a}
 
+This appendix gathers supplementary technical material meant to support reproducibility and methodological transparency for the experiments in Chapters~\ref{ch:baseline}, \ref{ch:nonlinear}, and \ref{ch:gw_alignment}. Section~\ref{sec:app_environment} documents the full software and hardware environment used throughout. Section~\ref{sec:app_script_mapping} maps every experimental result from Chapter~\ref{ch:gw_alignment} back to the specific script and execution mode that produced it. Section~\ref{sec:app_pseudocode} works through formal pseudocode for the core Optimal Transport algorithms that were only described in prose in the main text. Section~\ref{sec:app_hyperparam_spaces} consolidates the full hyperparameter search spaces explored across the Chapter~\ref{ch:gw_alignment} ablation study. Section~\ref{sec:app_notation} provides a complete reference table of the mathematical notation used throughout this thesis. Section~\ref{sec:app_data_availability} closes things out with a summary of data and code availability.
+
+\section{Software and Hardware Environment}
+\label{sec:app_environment}
+
+Every experiment in this thesis ran on the University of Padova's \gls{hpc} cluster, \texttt{labsrv7}, with job scheduling and resource allocation handled by Slurm. Table~\ref{tab:app_hw} lays out the compute hardware used across the different stages of the pipeline, and Table~\ref{tab:app_sw} lists the software environment and package versions behind every reported result.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Resource} & \textbf{Specification} \\
+\midrule
+GPU (feature extraction, main-scale runs) & NVIDIA A100, 20GB \gls{mig} partitions \\
+GPU (secondary / exploratory runs)        & Tesla V100 \\
+GPU (secondary / exploratory runs)        & Tesla T4 \\
+CPU (lightweight verification jobs)       & \texttt{labsrv7} CPU nodes (Test 12--13 sweeps) \\
+Job scheduler                             & Slurm workload manager \\
+\bottomrule
+\end{tabular}
+\caption{Hardware resources used across the experimental pipeline. Test
+allocation to GPU vs.\ CPU nodes is detailed per-experiment in
+Table~\ref{tab:app_script_mapping}.}
+\label{tab:app_hw}
+\end{table}
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Version} \\
+\midrule
+Python                          & 3.10 \\
+Conda environment               & \texttt{ott\_env} \\
+JAX                             & 0.6.2 \\
+OTT-JAX                         & 0.6.0 \\
+POT (Python Optimal Transport)  & 0.9.6 \\
+Pymanopt                        & (RISGW Stiefel manifold optimisation) \\
+scikit-learn                    & (StandardScaler, CCA cross-validation utilities) \\
+SciPy                           & (SVD, linear-sum-assignment for Hungarian matching) \\
+\bottomrule
+\end{tabular}
+\caption{Software environment (\texttt{ott\_env} conda environment) under
+which all experiments in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment}
+were executed.}
+\label{tab:app_sw}
+\end{table}
+
+Feature files live on the cluster filesystem under \texttt{features\_100k/}, one \texttt{.npy} array per encoder (\texttt{feat\_\{encoder\}\_part\_*.npy}), pre-partitioned into batches to support the auto-resume mechanism described in Section~\ref{subsec:feature_pipeline}. Every random operation --- anchor/query splitting, synthetic data generation, projection-direction sampling for SGW --- was seeded explicitly through \texttt{numpy.random.RandomState}, and the specific seed values are reported alongside each result throughout Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment}.
+
+\section{Script-to-Experiment Mapping}
+\label{sec:app_script_mapping}
+
+The thirteen-test ablation study of Section~\ref{sec:ablation_study}, along with the core GW variant implementations of Section~\ref{sec:gw_methods}, all came out of a small handful of dedicated Python scripts, each supporting multiple execution modes selected through command-line arguments. Table~\ref{tab:app_script_mapping} lays out the complete mapping between every quantitative result reported in Chapter~\ref{ch:gw_alignment} and the script and mode that generated it, so that any individual result can be reproduced exactly.
+
+\begin{table}[htpb]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lll}
+\toprule
+\textbf{Script} & \textbf{Mode / Function} & \textbf{Thesis Result} \\
+\midrule
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode sanity}      & Test 1 (Table~\ref{tab:sanity_check}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode selfgw}      & Test 2 (Table~\ref{tab:self_gw}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode eps\_sweep}  & Test 3 (\S\ref{subsec:hyperparameter_sweeps}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode sgw\_vs\_lrgw} & Test 4, Test 10 (Table~\ref{tab:cross_library}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode raw\_gw}     & Test 5, Test 12 (Table~\ref{tab:raw_features_test}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode cca\_sweep}  & Test 6, Test 8 (\S\ref{subsec:dataset_generalization}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode all\_pairs}  & Test 9 (\S\ref{subsec:dataset_generalization}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode transport}   & Test 11 (\S\ref{subsec:library_analysis}) \\
+\texttt{test\_lrgw\_exhaustive.py} & \texttt{--mode eps\_low}    & Test 13 (\S\ref{subsec:advanced_verifications}) \\
+\texttt{test\_sgw\_exhaustive.py}  & grid search (SGW/RISGW/SS-RISGW) & \S\ref{subsec:sliced_gw} best configurations \\
+\texttt{test\_fgw\_after\_cca.py}  & FGW, FGW anchor-constrained & \S\ref{subsec:fused_gw} (Table~\ref{tab:gw_results}) \\
+\texttt{gw\_diagnostic.py}         & six-pair compatibility sweep & Table~\ref{tab:gw-diagnostic} \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Complete mapping from thesis results (Chapter~\ref{ch:gw_alignment})
+to the generating script and execution mode. Feature paths, hyperparameters,
+and seeds for each mode are as specified in the corresponding chapter
+section.}
+\label{tab:app_script_mapping}
+\end{table}
+
+Each script writes its numerical output to a matching \texttt{results\_*.json} file --- \texttt{results\_lrgw\_exhaustive.json}, \texttt{results\_gw\_diagnostic.json}, and so on --- which was then parsed to populate the tables and figures presented throughout this thesis.
+
+\section{Algorithm Pseudocode}
+\label{sec:app_pseudocode}
+
+This section spells out formal pseudocode for the two algorithmic pieces underlying the unsupervised alignment methods of Chapter~\ref{ch:gw_alignment}: the Sliced Gromov-Wasserstein approximation from Section~\ref{subsec:sliced_gw}, and the Sinkhorn matrix-scaling procedure from Section~\ref{subsec:sinkhorn} that the LRSinkhorn sub-solver --- used by the Low-Rank Gromov-Wasserstein method of Section~\ref{subsec:low_rank_gw} --- is built on.
+
+\begin{algorithm}[htpb]
+\caption{Sliced Gromov-Wasserstein (SGW) Score Accumulation}
+\label{alg:sgw}
+\begin{algorithmic}[1]
+\Require 3D features $X \in \mathbb{R}^{n \times k}$, text features $Y \in \mathbb{R}^{n \times k}$, number of projections $P$
+\Ensure Score matrix $S \in \mathbb{R}^{n \times n}$
+\State $S \gets \mathbf{0}_{n \times n}$
+\For{$p = 1$ \textbf{to} $P$}
+    \State Sample random unit vector $\theta \sim \mathrm{Unif}(S^{k-1})$
+    \State $x_\theta \gets X \theta$ \Comment{project onto $\theta$}
+    \State $y_\theta \gets Y \theta$
+    \State $\pi_X \gets \mathrm{argsort}(x_\theta)$ \Comment{1D ordering}
+    \State $\pi_Y \gets \mathrm{argsort}(y_\theta)$
+    \State $c_X \gets$ pairwise squared distances of $\mathrm{sort}(x_\theta)$
+    \State $c_Y \gets$ pairwise squared distances of $\mathrm{sort}(y_\theta)$
+    \State $\mathrm{cost}_{\mathrm{id}} \gets \| c_X - c_Y \|^2$
+    \State $\mathrm{cost}_{\mathrm{anti}} \gets \| c_X - \mathrm{reverse}(c_Y) \|^2$
+    \If{$\mathrm{cost}_{\mathrm{id}} \leq \mathrm{cost}_{\mathrm{anti}}$}
+        \State $S[\pi_X, \pi_Y] \gets S[\pi_X, \pi_Y] + 1$
+    \Else
+        \State $S[\pi_X, \mathrm{reverse}(\pi_Y)] \gets S[\pi_X, \mathrm{reverse}(\pi_Y)] + 1$
+    \EndIf
+\EndFor
+\State \Return $S$
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:sgw} accumulates votes, over $P$ random 1D projections, for whichever pairing each projection's optimal 1D ordering implies --- either the identity alignment of the two sorted sequences, or their reversal, whichever comes out cheaper structurally. The resulting score matrix $S$ then serves directly as a similarity matrix for Top-$K$ retrieval and Hungarian matching evaluation, exactly as in Section~\ref{subsec:matching_acc}. It closely follows Algorithm 1 of \textcite{vayer2019optimal}, referenced back in Section~\ref{subsec:sliced_gw}.
+
+\begin{algorithm}[htpb]
+\caption{Sinkhorn Matrix Scaling (entropic OT sub-solver)}
+\label{alg:sinkhorn}
+\begin{algorithmic}[1]
+\Require Cost matrix $C \in \mathbb{R}^{n \times n}$, marginals $\mathbf{a}, \mathbf{b} \in \mathbb{R}^n$, regularisation $\epsilon > 0$, max.\ iterations $I$
+\Ensure Transport plan $T \in \mathbb{R}^{n \times n}$
+\State $K \gets \exp(-C / \epsilon)$ \Comment{Gibbs kernel}
+\State $u \gets \mathbf{1}_n$, $v \gets \mathbf{1}_n$
+\For{$i = 1$ \textbf{to} $I$}
+    \State $u \gets \mathbf{a} \oslash (K v)$ \Comment{element-wise division}
+    \State $v \gets \mathbf{b} \oslash (K^\top u)$
+    \If{$\| u \odot (Kv) - \mathbf{a} \|_1 < \text{tol}$}
+        \State \textbf{break} \Comment{marginal constraints satisfied}
+    \EndIf
+\EndFor
+\State $T \gets \mathrm{diag}(u) \, K \, \mathrm{diag}(v)$
+\State \Return $T$
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:sinkhorn} is the linear sub-solver called at every outer iteration of the Low-Rank Gromov-Wasserstein solver (Section~\ref{subsec:low_rank_gw}). Because the quadratic $\mathcal{GW}$ objective is non-convex, OTT-JAX's \texttt{GromovWasserstein} solver handles it by iteratively linearising the problem into a sequence of ordinary entropic \gls{ot} sub-problems of exactly this form, each one solved with a handful of Sinkhorn iterations before the outer loop moves the linearisation point. The regularisation parameter $\epsilon$ here is the very same hyperparameter swept in Tests 3 and 13 (Sections~\ref{subsec:hyperparameter_sweeps} and~\ref{subsec:advanced_verifications}); the \texttt{LRSinkhorn} variant used throughout Chapter~\ref{ch:gw_alignment} additionally restricts $u$ and $v$ to act on a rank-$r$ factorisation of $K$ rather than the full $n \times n$ matrix, as described in Section~\ref{subsec:low_rank_gw}.
+
+\section{Full Hyperparameter Search Spaces}
+\label{sec:app_hyperparam_spaces}
+
+Chapter~\ref{ch:gw_alignment} reports the best-performing configuration for each hyperparameter sweep in the thirteen-test ablation study, but the full search space behind each sweep is scattered across the prose. Table~\ref{tab:app_full_search_spaces} pulls every hyperparameter range tested in Chapter~\ref{ch:gw_alignment} into one place, alongside the value ultimately reported as best and a note on how it was selected --- always Top-5 retrieval accuracy on PointNet$\times$CLIP, unless stated otherwise.
+
+\begin{table}[htpb]
+\centering
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llll}
+\toprule
+\textbf{Hyperparameter} & \textbf{Full Search Space} & \textbf{Best Value} & \textbf{Source} \\
+\midrule
+LR-GW rank $r$                & $\{2, 5, 10, 20, 50, 100, 200\}$ & $r{=}50$ (2.4\% Top-5) & Test 6 \\
+Entropic regularisation $\epsilon$ (standard) & $\{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0\}$ & identical cost for all & Test 3 \\
+Entropic regularisation $\epsilon$ (fine, low range) & $\{10^{-4}, 5{\cdot}10^{-4}, 10^{-3}, 5{\cdot}10^{-3}, 10^{-2}, 5{\cdot}10^{-2}, 10^{-1}\}$ & identical cost for all & Test 13 \\
+CCA subspace dimension $k$    & $\{10, 20, 50, 100\}$ & $k{=}20$ for LR-GW (3.0\% Top-5); $k{=}50$ used as main protocol & Test 8 \\
+Query set size $n$            & $\{500, 1000, 2000\}$ & $n{=}500$ (no improvement with more data) & Test 7 \\
+FGW trade-off $\alpha$        & $[0, 1]$, swept continuously & $\alpha{=}0.2$ (4.4\% Top-5) & \S\ref{subsec:fused_gw} \\
+FGW anchor-constrained penalty & $\{0, 10, 100\}$ & penalty${=}10$ (identical to unconstrained) & \S\ref{subsec:fused_gw} \\
+SS-RISGW anchor weight $\lambda$ & $\{0, 0.1, 1.0, 10.0\}$ & $\lambda{=}1.0$ (1.4\% Top-5) & \S\ref{subsec:sliced_gw} \\
+SGW projection count           & 100 (fixed) & --- & \S\ref{subsec:sliced_gw} \\
+SGW/RISGW/SS-RISGW grid search & $k \in \{20,50,100\}$, $n_{\text{anchor}} \in \{1\text{k},5\text{k},30\text{k}\}$, $\lambda \in \{0,0.1,1.0,10.0\}$, 3 seeds (288 configurations total) & best: $k{=}20$, $n{=}5{,}000$ (SGW, 3.2\% Top-5) & \texttt{test\_sgw\_exhaustive.py} \\
+RISGW projection directions / iterations & 20 proj., 30 grad.\ iter.\ (fixed) & --- & \S\ref{subsec:sliced_gw} \\
+Cost function                  & $\{$squared-Euclidean, angular (arccos)$\}$ & angular (1.9\% vs.\ 0.4\% Top-5) & Test 4 \\
+Feature normalisation (pre-CCA) & $\{L_2\text{-norm}, \text{StandardScaler}\} \times \{\text{no SM}, \text{Li et al.\ SM}\}$ & all statistically equivalent ($\approx$1.5\%) & Test 12 \\
+\bottomrule
+\end{tabular}%
+}
+\caption{Complete hyperparameter search spaces explored across the
+thirteen-test ablation study and the core GW method implementations of
+Chapter~\ref{ch:gw_alignment}. ``SM'' denotes Li et al.'s median-ratio
+scale-matching normalisation (Section~\ref{subsec:unsupervised_alignment}).}
+\label{tab:app_full_search_spaces}
+\end{table}
+
+\section{Notation and Symbols}
+\label{sec:app_notation}
+
+Table~\ref{tab:app_notation} summarises the principal mathematical notation used throughout this thesis, for easy cross-chapter reference.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{First used} \\
+\midrule
+$X, Y$                  & 3D and text feature matrices & \S\ref{subsec:supervised_alignment} \\
+$X^r, Y^r$               & CCA-projected 3D and text features & \S\ref{subsec:supervised_alignment} \\
+$W_X, W_Y$               & CCA projection matrices & \S\ref{subsec:supervised_alignment} \\
+$k$                      & CCA subspace dimensionality & \S\ref{subsec:supervised_alignment} \\
+$R, b$                   & Affine transformation weight and bias & \S\ref{subsec:supervised_alignment} \\
+$n_A$                    & Number of anchor pairs & \S\ref{subsec:anchor_protocol} \\
+$n$                      & Number of query samples (or GW sample size) & \S\ref{sec:metrics} \\
+$\mu, \nu$                & Source and target probability measures & \S\ref{subsec:monge_kantorovich} \\
+$\pi, T$                 & Optimal transport / transport plan (coupling matrix) & \S\ref{subsec:monge_kantorovich} \\
+$c(x,y), C$               & Transport cost function / cost matrix & \S\ref{subsec:monge_kantorovich} \\
+$W_p$                    & $p$-Wasserstein distance & \S\ref{subsec:monge_kantorovich} \\
+$\epsilon$                & Entropic regularisation strength & \S\ref{subsec:sinkhorn} \\
+$H(T)$                   & Entropy of a transport plan & \S\ref{subsec:sinkhorn} \\
+$u, v$                   & Sinkhorn scaling vectors & \S\ref{subsec:sinkhorn} \\
+$\mathcal{GW}(X,Y)$        & Gromov-Wasserstein distance & \S\ref{subsec:gw_definition} \\
+$d_X, d_Y$                & Intra-domain distance metrics & \S\ref{subsec:gw_definition} \\
+$L(\cdot,\cdot)$          & GW discrepancy loss function & \S\ref{subsec:gw_definition} \\
+$r$                      & Low-rank GW factorisation rank & \S\ref{subsec:low_rank_gw} \\
+$Q, R, g$                 & LR-GW low-rank factor matrices & \S\ref{subsec:low_rank_gw} \\
+$\theta$                 & Random projection direction (SGW) & \S\ref{subsec:sliced_gw} \\
+$\Delta$                 & RISGW rotation matrix (Stiefel manifold) & \S\ref{subsec:sliced_gw} \\
+$\lambda$                & SS-RISGW anchor penalty weight & \S\ref{subsec:sliced_gw} \\
+$\alpha$                 & FGW structural/feature trade-off & \S\ref{subsec:fused_gw} \\
+$s$                      & Median-ratio scale-matching factor & \S\ref{subsec:unsupervised_alignment} \\
+$M, L$                    & RML Mahalanobis matrix and Cholesky factor & \S\ref{subsec:rml_implementation} \\
+$K, \gamma$                & KCCA kernel matrix and RBF bandwidth & \S\ref{subsec:kcca_implementation} \\
+$m$                      & Nystr\"{o}m landmark count & \S\ref{subsec:kcca_implementation} \\
+$\rho(T)$                 & Diagonal-to-uniform concentration ratio & \S\ref{subsec:entropy_definition} \\
+$\mathrm{CKA}(K,L)$        & Centered Kernel Alignment score & \S\ref{subsec:cka_definition} \\
+\bottomrule
+\end{tabular}
+\caption{Principal mathematical notation used throughout this thesis, in
+order of first appearance.}
+\label{tab:app_notation}
+\end{table}
+
+\section{Data and Code Availability}
+\label{sec:app_data_availability}
+
+The feature extraction pipeline, alignment method implementations, and diagnostic ablation scripts described throughout this thesis live in a private GitHub repository (\texttt{master-thesis}). Raw extracted features for all six encoder combinations (Table~\ref{tab:app_sw}) sit on the \texttt{labsrv7} cluster filesystem under \texttt{features\_100k/} and aren't redistributed as part of this thesis, simply because of their size --- $100{,}000$ objects across up to $1280$ dimensions per encoder adds up fast. The Objaverse dataset \cite{deitke2023objaverse} and its Cap3D captions \cite{luo2023scalable} are both publicly available from their original sources, and so are all the pre-trained encoder weights used in this work (PointNet, OpenCLIP ViT-bigG-14, BERT, RoBERTa), released by their respective original authors. The one exception is SparseConv, for which pre-trained weights simply weren't available at the time of writing (Section~\ref{subsec:3d_encoders}). Numerical results underlying every table in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment} are stored in the corresponding \texttt{results\_*.json} output files referenced in Table~\ref{tab:app_script_mapping}.
