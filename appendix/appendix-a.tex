@@ -156,7 +156,7 @@ Chapter~\ref{ch:gw_alignment} reports the best-performing configuration for each
 \begin{table}[htpb]
 \centering
 \small
-\begin{tabular}{p{3.2cm}p{2.8cm}p{4.3cm}p{1.3cm}}
+\begin{tabularx}{\textwidth}{p{3.0cm}Xp{4.2cm}l}
 \toprule
 \textbf{Hyperparameter} & \textbf{Full Search Space} & \textbf{Best Value} & \textbf{Source} \\
 \midrule
@@ -166,7 +166,7 @@ Entropic reg.\ $\epsilon$ (fine, low range) & $\{10^{-4}, \ldots, 10^{-1}\}$, 7 
 CCA subspace dimension $k$ & $\{10, 20, 50, 100\}$ & $k{=}20$ for LR-GW (3.0\% Top-5); $k{=}50$ main protocol & Test 8 \\
 Query set size $n$ & $\{500, 1000, 2000\}$ & $n{=}500$ (no gain from more data) & Test 7 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Core optimisation hyperparameters swept during the ablation study
 of Chapter~\ref{ch:gw_alignment} (Tests 3, 6, 7, 8), independent of the
 specific GW variant used.}
@@ -203,14 +203,14 @@ including the large-scale 288-configuration grid search.}
 \begin{table}[htpb]
 \centering
 \small
-\begin{tabular}{p{3.2cm}p{4.0cm}p{3.8cm}p{1.2cm}}
+\begin{tabularx}{\textwidth}{Xp{4.0cm}Xl}
 \toprule
 \textbf{Choice} & \textbf{Search Space} & \textbf{Best Value} & \textbf{Source} \\
 \midrule
 Cost function & $\{$squared-Euclidean, angular (arccos)$\}$ & angular (1.9\% vs.\ 0.4\% Top-5) & Test 4 \\
 Feature normalisation (pre-CCA) & $\{L_2\text{-norm}, \text{StandardScaler}\} \times \{\text{no SM}, \text{SM}\}$ & all $\approx$ equivalent ($\approx$1.5\%) & Test 12 \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \caption{Preprocessing choices tested in Tests 4 and 12. ``SM'' denotes Li
 et al.'s median-ratio scale-matching normalisation
 (Section~\ref{subsec:unsupervised_alignment}).}
@@ -268,4 +268,4 @@ order of first appearance.}
 \section{Data and Code Availability}
 \label{sec:app_data_availability}
 
-The feature extraction pipeline, alignment method implementations, and diagnostic ablation scripts described throughout this thesis live in a private GitHub repository (\texttt{master-thesis}). Raw extracted features for all six encoder combinations (Table~\ref{tab:app_sw}) sit on the \texttt{labsrv7} cluster filesystem under \texttt{features\_100k/} and aren't redistributed as part of this thesis, simply because of their size --- $100{,}000$ objects across up to $1280$ dimensions per encoder adds up fast. The Objaverse dataset \cite{deitke2023objaverse} and its Cap3D captions \cite{luo2023scalable} are both publicly available from their original sources, and so are all the pre-trained encoder weights used in this work (PointNet, OpenCLIP ViT-bigG-14, BERT, RoBERTa), released by their respective original authors. The one exception is SparseConv, for which pre-trained weights simply weren't available at the time of writing (Section~\ref{subsec:3d_encoders}). Numerical results underlying every table in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment} are stored in the corresponding \texttt{results\_*.json} output files referenced in Table~\ref{tab:app_script_mapping}.
+Every script behind the feature extraction pipeline, the alignment method implementations, and the diagnostic ablation study lives on the \texttt{labsrv7} cluster filesystem, organised under a single project directory rather than an external code repository. Raw extracted features for all six encoder combinations (Table~\ref{tab:app_sw}) sit there too, under \texttt{features\_100k/}, and aren't redistributed as part of this thesis --- simply because of their size, since $100{,}000$ objects across up to $1280$ dimensions per encoder adds up fast. The Objaverse dataset \cite{deitke2023objaverse} and its Cap3D captions \cite{luo2023scalable} are both publicly available from their original sources, and so are all the pre-trained encoder weights used in this work (PointNet, OpenCLIP ViT-bigG-14, BERT, RoBERTa), released by their respective original authors. The one exception is SparseConv, for which pre-trained weights simply weren't available at the time of writing (Section~\ref{subsec:3d_encoders}). Numerical results underlying every table in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment} are stored in the corresponding \texttt{results\_*.json} output files referenced in Table~\ref{tab:app_script_mapping}.

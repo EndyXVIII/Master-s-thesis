@@ -210,7 +210,7 @@ incompatibility of the spaces.}
 With the codebase validated, we turned to the optimisation dynamics themselves. The $\mathcal{GW}$ loss landscape is highly non-convex, and gradient-based solvers can get stuck in localised topological traps fairly easily if regularisation isn't tuned well.
 
 \paragraph{Test 3: Epsilon Regularisation Sweep.}
-Entropic regularisation ($\epsilon$) controls how smooth the transport plan is. We swept eight values ($\epsilon \in \{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0\}$) at rank 20 with cosine cost, and the solver returned an identical final \gls{gw} cost of $0.0392$ across all eight. In other words, the algorithm converges to exactly the same stationary point no matter how strong or weak the regularisation is --- there simply isn't a better local minimum sitting somewhere in the landscape for a different $\epsilon$ to find.
+Entropic regularisation ($\epsilon$) controls how smooth the transport plan is. We swept eight values ($\epsilon \in \{0.001, 0.005, 0.01, 0.05,\allowbreak 0.1, 0.5, 1.0, 5.0\}$) at rank 20 with cosine cost, and the solver returned an identical final \gls{gw} cost of $0.0392$ across all eight. In other words, the algorithm converges to exactly the same stationary point no matter how strong or weak the regularisation is --- there simply isn't a better local minimum sitting somewhere in the landscape for a different $\epsilon$ to find.
 
 \paragraph{Test 4: Cost Function Formulation.}
 High-dimensional neural representations don't always behave intuitively under standard Euclidean norms. We swapped the default squared-Euclidean distance (OTT-JAX's default) for an angular distance metric $d(x, x') = \arccos\!\left(\tfrac{x \cdot x'}{\|x\|\,\|x'\|}\right)$, following Li et al.~\cite{li2026scale}. The angular metric bumped Top-5 accuracy from $0.4\%$ to $1.9\%$ --- a real improvement, but a modest one, still roughly $18\times$ below the supervised \gls{cca}+Affine baseline \cite{hadgi2025escaping}. The distance function isn't what's holding things back.
@@ -397,7 +397,7 @@ of their starting compatibility.}
 
 Figure~\ref{fig:scale_factors} puts this same picture on a log-scale bar
 chart, and it is worth walking through it carefully. Recall from
-Section~\ref{subsec:unsupervised_alignment} that the scale factor $s =
+Section~\ref{subsec:unsupervised_alignment} that the scale factor \allowbreak $s =
 \text{med}(D_Y)/\text{med}(D_X)$ is the ratio between the two modalities'
 median intra-domain distances --- how far apart, typically, two points sit
 within the text space, divided by how far apart two points typically sit
