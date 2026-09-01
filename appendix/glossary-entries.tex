@@ -74,9 +74,6 @@
 \newacronym[description={\glslink{hpcg}{High-Performance Computing}}]
     {hpc}{HPC}{High-Performance Computing}
 
-\newacronym[description={\glslink{migg}{Multi-Instance GPU}}]
-    {mig}{MIG}{Multi-Instance GPU}
-
 \newacronym[description={\glslink{potg}{Python Optimal Transport}}]
     {pot}{POT}{Python Optimal Transport}
 
@@ -260,14 +257,7 @@
     name=\glslink{hpc}{HPC},
     text=High-Performance Computing,
     sort=high-performance computing,
-    description={a high-performance computing infrastructure composed of GPU/CPU clusters coordinated via a workload manager. In this thesis, computation was carried out on the University of Padova's \texttt{labsrv7} cluster, managed via Slurm}
-}
-
-\newglossaryentry{migg} {
-    name=\glslink{mig}{MIG},
-    text=Multi-Instance GPU,
-    sort=multi-instance gpu,
-    description={an NVIDIA technology that partitions a single physical GPU (in this thesis, a 20GB NVIDIA A100) into multiple isolated instances, each usable as an independent GPU for parallel workloads}
+    description={a high-performance computing infrastructure composed of GPU/CPU clusters coordinated via a workload manager. In this thesis, jobs were submitted from the University of Padova Department of Mathematics' \texttt{labsrv7} access host and scheduled onto the cluster's compute nodes via Slurm}
 }
 
 \newglossaryentry{potg} {

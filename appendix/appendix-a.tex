@@ -11,20 +11,22 @@ Every experiment in this thesis ran on the University of Padova's \gls{hpc} clus
 \begin{table}[htpb]
 \centering
 \small
-\begin{tabular}{ll}
+\begin{tabularx}{\textwidth}{lX}
 \toprule
 \textbf{Resource} & \textbf{Specification} \\
 \midrule
-GPU (feature extraction, main-scale runs) & NVIDIA A100, 20GB \gls{mig} partitions \\
-GPU (secondary / exploratory runs)        & Tesla V100 \\
-GPU (secondary / exploratory runs)        & Tesla T4 \\
-CPU (lightweight verification jobs)       & \texttt{labsrv7} CPU nodes (Test 12--13 sweeps) \\
-Job scheduler                             & Slurm workload manager \\
+Submit / access host & \texttt{labsrv7.math.unipd.it} \\
+GPU nodes available & \texttt{dellcuda1} (1$\times$ NVIDIA A100), \texttt{dellcuda0}, \texttt{dellcuda2}, \texttt{dellsrv1} (1$\times$ NVIDIA V100 each), \texttt{dellsrv2--dellsrv5} (1$\times$ NVIDIA T4 each) \\
+CPU-only nodes (lightweight verification jobs) & e.g.\ \texttt{hpblade04--hpblade16} (Test 12--13 sweeps) \\
+Job scheduler & Slurm workload manager \\
 \bottomrule
-\end{tabular}
-\caption{Hardware resources used across the experimental pipeline. Test
-allocation to GPU vs.\ CPU nodes is detailed per-experiment in
-Table~\ref{tab:app_script_mapping}.}
+\end{tabularx}
+\caption{Hardware resources used across the experimental pipeline, per
+the Department of Mathematics HPC cluster specification
+(\url{https://hpc.math.unipd.it/cluster-description/}). Jobs were
+submitted from the \texttt{labsrv7} access host and scheduled onto the
+cluster's compute nodes via Slurm; CPU allocation for Tests 12--13 is
+confirmed directly from job logs (\texttt{Devices: [CpuDevice(id=0)]}).}
 \label{tab:app_hw}
 \end{table}
 
@@ -149,7 +151,27 @@ Algorithm~\ref{alg:sinkhorn} is the linear sub-solver called at every outer iter
 \section{Full Hyperparameter Search Spaces}
 \label{sec:app_hyperparam_spaces}
 
-Chapter~\ref{ch:gw_alignment} reports the best-performing configuration for each hyperparameter sweep in the thirteen-test ablation study, but the full search space behind each sweep is scattered across the prose. Table~\ref{tab:app_full_search_spaces} pulls every hyperparameter range tested in Chapter~\ref{ch:gw_alignment} into one place, alongside the value ultimately reported as best and a note on how it was selected --- always Top-5 retrieval accuracy on PointNet$\times$CLIP, unless stated otherwise.
+Chapter~\ref{ch:gw_alignment} reports the best-performing configuration for each hyperparameter sweep in the thirteen-test ablation study, but the full search space behind each sweep is scattered across the prose. This section pulls every hyperparameter range tested in Chapter~\ref{ch:gw_alignment} into three organised references, grouped by what they actually govern: Table~\ref{tab:app_search_core} covers the core optimisation hyperparameters that apply broadly across LR-GW regardless of variant --- rank, regularisation, subspace dimension, and query size, swept in Tests 3, 6, 7, and 8. Table~\ref{tab:app_search_methods} reports the hyperparameters specific to the sliced and semi-supervised GW variants (FGW, SS-RISGW, SGW, RISGW), including the large-scale grid search underlying the SGW family. Table~\ref{tab:app_search_preprocessing} covers the two preprocessing choices tested in Tests 4 and 12. Unless stated otherwise, ``best value'' always refers to the configuration achieving the highest Top-5 retrieval accuracy on PointNet$\times$CLIP.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{p{3.2cm}p{2.8cm}p{4.3cm}p{1.3cm}}
+\toprule
+\textbf{Hyperparameter} & \textbf{Full Search Space} & \textbf{Best Value} & \textbf{Source} \\
+\midrule
+LR-GW rank $r$ & $\{2, 5, 10, 20, 50, 100, 200\}$ & $r{=}50$ (2.4\% Top-5) & Test 6 \\
+Entropic reg.\ $\epsilon$ (standard) & $\{0.001, \ldots, 5.0\}$, 8 values & identical cost for all & Test 3 \\
+Entropic reg.\ $\epsilon$ (fine, low range) & $\{10^{-4}, \ldots, 10^{-1}\}$, 7 values & identical cost for all & Test 13 \\
+CCA subspace dimension $k$ & $\{10, 20, 50, 100\}$ & $k{=}20$ for LR-GW (3.0\% Top-5); $k{=}50$ main protocol & Test 8 \\
+Query set size $n$ & $\{500, 1000, 2000\}$ & $n{=}500$ (no gain from more data) & Test 7 \\
+\bottomrule
+\end{tabular}
+\caption{Core optimisation hyperparameters swept during the ablation study
+of Chapter~\ref{ch:gw_alignment} (Tests 3, 6, 7, 8), independent of the
+specific GW variant used.}
+\label{tab:app_search_core}
+\end{table}
 
 \begin{table}[htpb]
 \centering
@@ -157,29 +179,42 @@ Chapter~\ref{ch:gw_alignment} reports the best-performing configuration for each
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{llll}
 \toprule
-\textbf{Hyperparameter} & \textbf{Full Search Space} & \textbf{Best Value} & \textbf{Source} \\
+\textbf{Method} & \textbf{Hyperparameter} & \textbf{Search Space / Best Value} & \textbf{Source} \\
 \midrule
-LR-GW rank $r$                & $\{2, 5, 10, 20, 50, 100, 200\}$ & $r{=}50$ (2.4\% Top-5) & Test 6 \\
-Entropic regularisation $\epsilon$ (standard) & $\{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0\}$ & identical cost for all & Test 3 \\
-Entropic regularisation $\epsilon$ (fine, low range) & $\{10^{-4}, 5{\cdot}10^{-4}, 10^{-3}, 5{\cdot}10^{-3}, 10^{-2}, 5{\cdot}10^{-2}, 10^{-1}\}$ & identical cost for all & Test 13 \\
-CCA subspace dimension $k$    & $\{10, 20, 50, 100\}$ & $k{=}20$ for LR-GW (3.0\% Top-5); $k{=}50$ used as main protocol & Test 8 \\
-Query set size $n$            & $\{500, 1000, 2000\}$ & $n{=}500$ (no improvement with more data) & Test 7 \\
-FGW trade-off $\alpha$        & $[0, 1]$, swept continuously & $\alpha{=}0.2$ (4.4\% Top-5) & \S\ref{subsec:fused_gw} \\
-FGW anchor-constrained penalty & $\{0, 10, 100\}$ & penalty${=}10$ (identical to unconstrained) & \S\ref{subsec:fused_gw} \\
-SS-RISGW anchor weight $\lambda$ & $\{0, 0.1, 1.0, 10.0\}$ & $\lambda{=}1.0$ (1.4\% Top-5) & \S\ref{subsec:sliced_gw} \\
-SGW projection count           & 100 (fixed) & --- & \S\ref{subsec:sliced_gw} \\
-SGW/RISGW/SS-RISGW grid search & $k \in \{20,50,100\}$, $n_{\text{anchor}} \in \{1\text{k},5\text{k},30\text{k}\}$, $\lambda \in \{0,0.1,1.0,10.0\}$, 3 seeds (288 configurations total) & best: $k{=}20$, $n{=}5{,}000$ (SGW, 3.2\% Top-5) & \texttt{test\_sgw\_exhaustive.py} \\
-RISGW projection directions / iterations & 20 proj., 30 grad.\ iter.\ (fixed) & --- & \S\ref{subsec:sliced_gw} \\
-Cost function                  & $\{$squared-Euclidean, angular (arccos)$\}$ & angular (1.9\% vs.\ 0.4\% Top-5) & Test 4 \\
-Feature normalisation (pre-CCA) & $\{L_2\text{-norm}, \text{StandardScaler}\} \times \{\text{no SM}, \text{Li et al.\ SM}\}$ & all statistically equivalent ($\approx$1.5\%) & Test 12 \\
+FGW & Trade-off $\alpha$ & $[0, 1]$ continuous; best $\alpha{=}0.2$ (4.4\% Top-5) & \S\ref{subsec:fused_gw} \\
+FGW anchor-constrained & Penalty & $\{0, 10, 100\}$; best $=10$ (identical to unconstrained) & \S\ref{subsec:fused_gw} \\
+SS-RISGW & Anchor weight $\lambda$ & $\{0, 0.1, 1.0, 10.0\}$; best $\lambda{=}1.0$ (1.4\% Top-5) & \S\ref{subsec:sliced_gw} \\
+SGW & Projection count & 100 (fixed) & \S\ref{subsec:sliced_gw} \\
+RISGW & Projections / iterations & 20 proj., 30 grad.\ iter.\ (fixed) & \S\ref{subsec:sliced_gw} \\
+\midrule
+\multicolumn{4}{l}{\textit{SGW / RISGW / SS-RISGW exhaustive grid search (288 configurations total)}} \\
+\midrule
+\multicolumn{4}{l}{$k \in \{20, 50, 100\}$, \quad $n_{\text{anchor}} \in \{1\text{k}, 5\text{k}, 30\text{k}\}$, \quad $\lambda \in \{0, 0.1, 1.0, 10.0\}$, \quad 3 seeds} \\
+\multicolumn{4}{l}{Best: $k{=}20$, $n{=}5{,}000$ (SGW, 3.2\% Top-5) --- see \texttt{test\_sgw\_exhaustive.py}} \\
 \bottomrule
 \end{tabular}%
 }
-\caption{Complete hyperparameter search spaces explored across the
-thirteen-test ablation study and the core GW method implementations of
-Chapter~\ref{ch:gw_alignment}. ``SM'' denotes Li et al.'s median-ratio
-scale-matching normalisation (Section~\ref{subsec:unsupervised_alignment}).}
-\label{tab:app_full_search_spaces}
+\caption{Method-specific hyperparameters and their search spaces for the
+semi-supervised and sliced GW variants (FGW, SS-RISGW, SGW, RISGW),
+including the large-scale 288-configuration grid search.}
+\label{tab:app_search_methods}
+\end{table}
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{p{3.2cm}p{4.0cm}p{3.8cm}p{1.2cm}}
+\toprule
+\textbf{Choice} & \textbf{Search Space} & \textbf{Best Value} & \textbf{Source} \\
+\midrule
+Cost function & $\{$squared-Euclidean, angular (arccos)$\}$ & angular (1.9\% vs.\ 0.4\% Top-5) & Test 4 \\
+Feature normalisation (pre-CCA) & $\{L_2\text{-norm}, \text{StandardScaler}\} \times \{\text{no SM}, \text{SM}\}$ & all $\approx$ equivalent ($\approx$1.5\%) & Test 12 \\
+\bottomrule
+\end{tabular}
+\caption{Preprocessing choices tested in Tests 4 and 12. ``SM'' denotes Li
+et al.'s median-ratio scale-matching normalisation
+(Section~\ref{subsec:unsupervised_alignment}).}
+\label{tab:app_search_preprocessing}
 \end{table}
 
 \section{Notation and Symbols}

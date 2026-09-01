@@ -395,7 +395,43 @@ of their starting compatibility.}
 \label{tab:gw-diagnostic}
 \end{table}
 
-Li et al.'s validated metric correlates strongly with Vision-Language Model (VLM) downstream performance ($R^2 = 0.43$ across $60+$ full training runs), and by that yardstick, this cost threshold flags our feature spaces as intrinsically low-compatibility. With no underlying structural homology to work with, the \gls{gw} solver has nothing geometric to latch onto --- the transport plan it produces is mathematically valid, but semantically meaningless.
+Figure~\ref{fig:scale_factors} puts this same picture on a log-scale bar
+chart, and it is worth walking through it carefully. Recall from
+Section~\ref{subsec:unsupervised_alignment} that the scale factor $s =
+\text{med}(D_Y)/\text{med}(D_X)$ is the ratio between the two modalities'
+median intra-domain distances --- how far apart, typically, two points sit
+within the text space, divided by how far apart two points typically sit
+within the 3D space. A value of $s=1$ (marked by the dotted grey line)
+means the two spaces are already on matched scales; the two blue bars sit
+below that line, meaning PointNet's 3D space is more spread out than
+RoBERTa's or BERT's text space for those pairs, while the four red bars
+sit above it, meaning the text space is more spread out than the 3D space
+for those pairs --- most dramatically so for SparseConv$\times$CLIP. The
+vertical axis is logarithmic rather than linear for a simple reason: the
+six values span roughly six orders of magnitude, from $s \approx 0.09$
+(PointNet$\times$RoBERTa) up to $s \approx 228{,}000$
+(SparseConv$\times$CLIP); on a normal linear axis, five of the six bars
+would be visually indistinguishable from zero, with the sixth dwarfing
+everything else. No amount of scale-matching alone could plausibly
+reconcile spaces this mismatched --- which is exactly why the post-CCA
+convergence to a near-identical $\mathcal{GW}$ cost across all six pairs,
+reported in Table~\ref{tab:gw-diagnostic} above, is such a striking result:
+whatever CCA is doing, it is erasing a starting gap of six orders of
+magnitude down to nothing.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{fig_scale_factors.pdf}
+  \caption{Median-ratio scale factor $s = \mathrm{med}(D_Y)/\mathrm{med}(D_X)$
+  across all six encoder pairs, shown on a logarithmic scale. Blue bars
+  indicate $s < 1$ (3D space more dispersed than text); red bars indicate
+  $s > 1$ (text space more dispersed than 3D). The raw feature spaces
+  operate on wildly mismatched metric scales, spanning roughly six orders
+  of magnitude.}
+  \label{fig:scale_factors}
+\end{figure}
+
+According to Li et al.'s validated metric, which correlates strongly with Vision-Language Model (VLM) downstream performance ($R^2 = 0.43$ across $60+$ full training runs), this cost threshold flags our feature spaces as intrinsically low-compatibility. With no underlying structural homology to work with, the \gls{gw} solver has nothing geometric to latch onto --- the transport plan it produces is mathematically valid, but semantically meaningless.
 
 \subsection{Final Method Ranking and The Necessity of Supervision}
 \label{subsec:necessity_supervision}
@@ -447,7 +483,25 @@ averaged over 3 random seeds.}
 \label{tab:final_ranking}
 \end{table}
 
-So why does \gls{cca} + Affine succeed where \gls{gw} fails? The affine mapping $T(x) = Rx + b$ strictly minimises the mathematical discrepancy between predefined semantic anchor pairs, completely overriding the natural global topology of the manifolds --- it doesn't need the 3D space to resemble the text space geometrically at all, because it just forces the correlation through supervised constraints instead.
+Figure~\ref{fig:method_ranking} lays this same ranking out visually, and
+the pattern jumps out immediately: the gap between CCA+Affine and every
+unsupervised or semi-supervised GW variant is not a gentle slope, it's a
+cliff. Performance drops almost entirely at the supervision boundary
+itself, rather than tapering off gradually as methods get more or less
+sophisticated --- which is really the whole story of this chapter in one
+picture.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{fig_method_ranking.pdf}
+  \caption{Top-5 retrieval accuracy across all tested alignment methods on
+  PointNet $\times$ CLIP. The sharp drop between supervised and
+  unsupervised/semi-supervised methods illustrates the central empirical
+  finding of this thesis.}
+  \label{fig:method_ranking}
+\end{figure}
+
+Why does the \gls{cca} + Affine pipeline succeed where \gls{gw} fails? The affine mapping $T(x) = Rx + b$ strictly minimises the mathematical discrepancy between predefined semantic anchor pairs, completely overriding the natural global topology of the manifolds --- it doesn't need the 3D space to resemble the text space geometrically at all, because it just forces the correlation through supervised constraints instead.
 
 Gromov-Wasserstein, meanwhile, operates blind, with no labels to lean on. All it can exploit is structural similarity, and as the \gls{cka} scores and our thirteen ablation tests both make clear, that similarity is fundamentally absent between raw 3D coordinate representations and linguistic transformer embeddings.
 

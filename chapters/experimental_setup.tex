@@ -4,7 +4,7 @@
 \section{Dataset: Objaverse}
 \label{sec:dataset_objaverse}
 
-To gauge the structural alignment between 3D object shapes and text descriptions, a massive dataset of multimodal paired data is requisite. For this effort, we elected to utilize Objaverse \cite{deitke2023objaverse}, which is the most extensive public repository of multimodal 3D models paired with natural language captions generated from the Cap3D captioning framework \cite{luo2023scalable}. Unlike earlier, restricted synthetic datasets only supporting limited classes of fixed, rigid objects, Objaverse provides a comprehensive, realistic geometric and semantic distribution well-suited for analyzing the correlation of the various cross-modal latent spaces.
+Gauging the structural alignment between 3D object shapes and text descriptions calls for a massive dataset of multimodal paired data. For this, we settled on Objaverse \cite{deitke2023objaverse}, the most extensive public repository of multimodal 3D models paired with natural language captions, generated through the Cap3D captioning framework \cite{luo2023scalable}. Earlier synthetic datasets tended to be restricted to a handful of fixed, rigid object classes; Objaverse instead offers a genuinely comprehensive and realistic geometric and semantic distribution, which is exactly what's needed to study the correlation between these cross-modal latent spaces properly.
 
 \begin{figure}[htpb]
     \centering
@@ -16,11 +16,11 @@ To gauge the structural alignment between 3D object shapes and text descriptions
 \subsection{Feature Extraction Pipeline}
 \label{subsec:feature_pipeline}
 
-The experimental workflow was instantiated on the University of Padova’s high-performance computing (HPC) cluster, \texttt{labsrv7}. We distributed feature extraction as well as pair alignment across NVIDIA A100 (20GB \gls{mig}), Tesla V100 and Tesla T4 GPUs via use of the Slurm workload management system.
+The whole experimental workflow ran on the University of Padova's high-performance computing (HPC) cluster, \texttt{labsrv7}. Feature extraction and pair alignment were spread across NVIDIA A100, Tesla V100, and Tesla T4 GPUs, all managed through the Slurm workload management system.
 
-We begin by sampling $100{,}000$ 3D objects from the Objaverse dataset. Before extracting geometric features, each 3D mesh was standardized: we uniformly sampled $2{,}048$ surface points, then centered each sample by subtracting the point-cloud’s mean and normalized by taking the maximum value along its euclidean dimensions. The feature extraction pipeline efficiently processes objects in batches of $10{,}000$ objects and features an auto-resume mechanism in case a node failure or job interrupt occurs. After filtering out meshes containing an error and samples with insufficient or nonsensical associated text, we arrived at a set of $46{,}675$ paired samples that had a clean textual annotation for all items across every modality.
+We start by sampling $100{,}000$ 3D objects from Objaverse. Each mesh gets standardised before any feature extraction happens: we uniformly sample $2{,}048$ surface points, centre the sample by subtracting the point cloud's mean, then normalise by the maximum value along its Euclidean dimensions. The pipeline processes objects in batches of $10{,}000$, with an auto-resume mechanism built in for whenever a node fails or a job gets interrupted --- which, on a shared HPC cluster, happens more often than you'd like. After filtering out meshes with errors and samples whose associated text was missing or nonsensical, we ended up with $46{,}675$ paired samples carrying a clean textual annotation across every modality.
 
-\paragraph{Preprocessing Details.} Beyond the point-cloud standardisation described above, each modality underwent an additional normalisation step prior to any alignment method being fitted. All 3D and text feature vectors were $L_2$-normalised to unit norm immediately after extraction, ensuring that subsequent cosine-similarity-based retrieval metrics (Section~\ref{subsec:topk_acc}) are not confounded by differences in the absolute magnitude of embeddings produced by architecturally distinct encoders. For methods requiring zero-mean input --- specifically the raw-feature ablation of Test 12 in Chapter~\ref{ch:gw_alignment} --- a StandardScaler transformation (zero mean, unit variance per dimension, fitted on the anchor split only and applied unchanged to the query split) was additionally evaluated as an alternative to $L_2$-normalisation, to isolate whether the choice of normalisation scheme itself could account for observed performance differences. No outlier removal or clipping was applied to any feature vector, as the diagnostic purpose of this thesis requires that raw encoder outputs remain unmodified wherever possible.
+\paragraph{Preprocessing Details.} Beyond the point-cloud standardisation above, each modality went through one more normalisation step before any alignment method was fitted. All 3D and text feature vectors were $L_2$-normalised to unit norm right after extraction, so that the cosine-similarity-based retrieval metrics used later (Section~\ref{subsec:topk_acc}) wouldn't be thrown off by differences in the raw magnitude of embeddings coming from architecturally very different encoders. For methods that need zero-mean input --- specifically the raw-feature ablation of Test 12 in Chapter~\ref{ch:gw_alignment} --- we also tried a StandardScaler transformation (zero mean, unit variance per dimension, fitted on the anchor split only and applied unchanged to the query split), just to isolate whether the normalisation scheme itself was driving any of the observed performance differences. No outlier removal or clipping was applied anywhere: since the whole point of this thesis is diagnostic, we wanted the raw encoder outputs left as untouched as possible.
 
 \begin{figure}[htpb]
   \centering
@@ -38,9 +38,9 @@ We begin by sampling $100{,}000$ 3D objects from the Objaverse dataset. Before e
 \subsection{Anchor Pairs and Query Protocol}
 \label{subsec:anchor_protocol}
 
-In conjunction with the approach employed by \textcite{hadgi2025escaping}, we extract the alignment spaces and evaluate the representations themselves utilizing a strictly-defined subset partition of the dataset to define an anchoring subset and a querying subset, composed of $n_A = 30{,}000$ and $500$ matched pairs respectively. This allows explicit training for Canonical Correlation Analysis (CCA) projection and affine-mapping construction from the canonical directions whilst, at the same time, maintaining unseen objects used exclusively to evaluate the quality of the generated alignments. All evaluated quantitative results were produced by taking the mean over three independent data splits defined by these anchor/query partitions.
+Following \textcite{hadgi2025escaping}'s approach, we split the dataset into a strictly-defined anchoring subset and querying subset --- $n_A = 30{,}000$ and $500$ matched pairs, respectively --- and use them to extract the alignment spaces and evaluate the resulting representations. The anchoring subset drives the explicit fitting of the Canonical Correlation Analysis (CCA) projection and the affine-mapping construction from the canonical directions, while the query subset stays entirely unseen, reserved purely for evaluating how good the resulting alignments actually are. Every quantitative result reported here is the mean over three independent data splits built from these anchor/query partitions.
 
-\paragraph{Hyperparameter Summary.} Table~\ref{tab:hyperparam_summary} consolidates the principal hyperparameters used across every alignment method evaluated in this thesis, most of which are introduced individually in their respective chapters but are collected here for ease of reference and reproducibility.
+\paragraph{Hyperparameter Summary.} Table~\ref{tab:hyperparam_summary} pulls together the principal hyperparameters used across every alignment method in this thesis. Most of these get introduced individually in their respective chapters, but it's useful to have them collected here in one place, both for quick reference and for reproducibility.
 
 \begin{table}[htpb]
 \centering
@@ -68,125 +68,82 @@ LR-GW              & \ref{ch:gw_alignment} & rank $r \in \{2,\ldots,200\}$ (best
 \section{Encoders}
 \label{sec:encoders_setup}
 
-To thoroughly investigate how different neural architectures shape their resulting latent spaces, we set up a diverse array of feature extractors. Our selection strategy was not necessarily aimed at pushing state-of-the-art performance, but rather at understanding how architectural priors---such as unimodal versus multimodal pre-training---dictate the geometric topology of the embedded data.
+To really dig into how different neural architectures shape their resulting latent spaces, we assembled a fairly diverse set of feature extractors. The goal wasn't to chase state-of-the-art performance for its own sake, but to understand how architectural priors --- unimodal versus multimodal pre-training, in particular --- end up dictating the geometric topology of the embedded data.
 
 \subsection{3D Encoders: PointNet and SparseConv}
 \label{subsec:3d_encoders}
 
-Processing 3D geometries introduces unique challenges, primarily because raw
-point clouds lack a regular grid structure and are strictly permutation
-invariant. To handle our standardised $2{,}048$-point samples, we deployed
-two fundamentally different geometric backbones.
+Processing 3D geometries comes with its own headaches, mostly because raw point clouds lack any regular grid structure and are strictly permutation invariant. To handle our standardised $2{,}048$-point samples, we deployed two architecturally quite different geometric backbones.
 
-We relied on PointNet as our primary pre-trained extractor. PointNet directly
-consumes the raw $(x, y, z)$ coordinates, passing them through shared
-Multi-Layer Perceptrons (MLPs) and eventually using a symmetric max-pooling
-function to aggregate global shape features. This process yields a robust
-$1024$-dimensional feature vector. Its straightforward, global approach makes
-it an excellent baseline for latent space analysis, as the resulting geometry
-is not overly distorted by hierarchical inductive biases.
+PointNet served as our primary pre-trained extractor. It consumes the raw $(x, y, z)$ coordinates directly, passes them through shared Multi-Layer Perceptrons (MLPs), and aggregates global shape features via symmetric max-pooling, producing a robust $1024$-dimensional feature vector. Its straightforward, global approach makes it a solid baseline for latent space analysis, precisely because the resulting geometry isn't heavily distorted by hierarchical inductive biases the way a more elaborate architecture's might be.
 
-To contrast this, we also integrated a Sparse Convolutional Network
-(SparseConv). Unlike PointNet's global pooling, SparseConv discretises the
-3D space into a sparse voxel grid and applies convolutions exclusively to
-occupied regions, which is theoretically much better at capturing fine-grained
-local geometries. We configured this backbone to output $512$-dimensional
-embeddings. Notably, as we will discuss in the baseline evaluations, we
-deliberately utilised SparseConv without pre-training (random weight
-initialisation).\footnote{Pre-trained SparseConv weights were requested from
-the original authors of \textcite{hadgi2025escaping} but were not available
-at the time of writing. The random-weight configuration therefore represents
-a lower bound on SparseConv performance, and results are expected to improve
-substantially once pre-trained weights become available.} This specific
-experimental choice allows us to isolate and observe the raw alignment
-capabilities of the spatial architecture itself, entirely separated from
-learned feature representations.
+To contrast this, we also brought in a Sparse Convolutional Network (SparseConv). Unlike PointNet's global pooling, SparseConv discretises the 3D space into a sparse voxel grid and restricts convolutions to occupied regions, which in principle should capture fine-grained local geometry much better. We configured this backbone to output $512$-dimensional embeddings. Notably --- and this becomes relevant in the baseline evaluations later --- we deliberately used SparseConv without any pre-training at all (random weight initialisation).\footnote{Pre-trained SparseConv weights were requested from the original authors of \textcite{hadgi2025escaping} but were not available at the time of writing. The random-weight configuration therefore represents a lower bound on SparseConv performance, and results are expected to improve substantially once pre-trained weights become available.} This choice lets us isolate the raw alignment capabilities of the spatial architecture itself, completely separated from anything the network might have learned.
 
 \subsection{Text Encoders: OpenCLIP, RoBERTa, and BERT}
 \label{subsec:text_encoders_setup}
 
-For the textual modality, the central research question is whether purely
-linguistic representations can be mapped to 3D geometries via optimal
-transport, or if explicit visual pre-training is a strict prerequisite for
-cross-modal alignment. To cover this spectrum, we extracted features using
-three distinct transformer-based models.
+On the textual side, the central question is whether purely linguistic representations can be mapped onto 3D geometry via optimal transport, or whether explicit visual pre-training is really a hard requirement for cross-modal alignment. To cover that spectrum, we extracted features from three distinct transformer-based models.
 
-Our strongest text backbone is the encoder derived from OpenCLIP
-(specifically the \texttt{ViT-bigG-14} variant). Because \gls{clip} is
-contrastively trained on massive image-text pairs, its latent space
-inherently encodes physical and visual semantics. We hypothesise that this
-underlying ``visual grounding'' makes its text embeddings significantly more
-compatible with 3D structural spaces.
+Our strongest text backbone comes from OpenCLIP, specifically the \texttt{ViT-bigG-14} variant. Because \gls{clip} is trained contrastively on massive image-text pairs, its latent space inherently encodes physical and visual semantics --- we suspect this underlying ``visual grounding'' is exactly what makes its text embeddings more compatible with 3D structural spaces.
 
-To evaluate purely linguistic spaces, we extracted text embeddings using \gls{bert}
-and \gls{roberta}. These models were trained strictly on masked language modelling
-objectives over massive text corpora, with absolutely no exposure to visual,
-spatial, or geometric data. \gls{bert} provides our standard uni-modal baseline,
-while \gls{roberta} represents a heavily optimised evolution of the same
-architecture. By comparing the alignment behaviour of these pure language
-models against \gls{clip}, we can accurately quantify how much of the cross-modal
-translation success relies on the text encoder already ``knowing'' what the
-physical world looks like --- a hypothesis that is directly validated by the
-results presented in Chapter~\ref{ch:baseline}, where \gls{clip}-paired encoders
-consistently and substantially outperform purely linguistic alternatives
-across all evaluation metrics.
+To probe purely linguistic spaces, we also extracted embeddings from \gls{bert} and \gls{roberta}. Both were trained strictly on masked language modelling objectives over massive text corpora, with zero exposure to visual, spatial, or geometric data of any kind. \gls{bert} acts as our standard uni-modal baseline, while \gls{roberta} represents a heavily optimised evolution of the same underlying architecture. Comparing how these pure language models align against \gls{clip} lets us gauge how much of the cross-modal translation success actually comes down to the text encoder already ``knowing'' what the physical world looks like --- a hypothesis borne out directly by the results in Chapter~\ref{ch:baseline}, where \gls{clip}-paired encoders consistently and substantially outperform the purely linguistic alternatives across every evaluation metric.
 
 \section{Evaluation Metrics}
 \label{sec:metrics}
 
-Quantifying the success of cross-modal alignment requires robust metrics that capture both strict one-to-one correspondences and broader semantic retrieval capabilities. To ensure our evaluation remains strictly comparable with the supervised linear baseline, we assess the aligned representations using two primary criteria applied to our held-out query set of $500$ pairs.
+Quantifying how well cross-modal alignment actually works means capturing both strict one-to-one correspondences and broader semantic retrieval capability. To keep the evaluation strictly comparable with the supervised linear baseline, we assess the aligned representations using two primary criteria, applied to our held-out query set of $500$ pairs.
 
 \subsection{Matching Accuracy}
 \label{subsec:matching_acc}
 
-Matching accuracy is the most stringent metric we employ. We frame the evaluation as a bipartite matching problem: given a completely shuffled set of 500 query point clouds and their 500 corresponding text embeddings, the algorithm must reconstruct the exact original pairs. 
+Matching accuracy is the strictest metric we use. We frame the evaluation as a bipartite matching problem: given a completely shuffled set of 500 query point clouds and their 500 corresponding text embeddings, the algorithm has to reconstruct the exact original pairs.
 
-To achieve this, we first compute a dense pairwise distance matrix between all projected 3D and text features. We then apply the Hungarian algorithm (Linear Sum Assignment) to find the global permutation that minimizes the total cost across the entire batch. The matching accuracy is simply reported as the percentage of correctly recovered pairs. While mathematically elegant, this metric is exceptionally harsh. In a dataset as diverse as Objaverse, two distinct objects might share very similar geometries or semantic descriptions, meaning the algorithm is heavily penalized for confusing a generic "wooden chair" with another highly similar "wooden chair" in the batch.
+To do this, we first compute a dense pairwise distance matrix between all projected 3D and text features, then apply the Hungarian algorithm (Linear Sum Assignment) to find the global permutation minimising total cost across the batch. Matching accuracy is simply the percentage of correctly recovered pairs. It's mathematically elegant, but genuinely harsh as a metric --- in a dataset as diverse as Objaverse, two distinct objects can share very similar geometry or near-identical semantic descriptions, so the algorithm gets penalised heavily for confusing one generic ``wooden chair'' with another equally generic ``wooden chair'' sitting elsewhere in the batch.
 
 \subsection{Top-K Retrieval Accuracy}
 \label{subsec:topk_acc}
 
-Because exact matching can be overly rigid for multimodal tasks, Top-$K$ retrieval serves as our primary indicator of practical alignment quality. Instead of forcing a global 1-to-1 assignment, retrieval tests the local neighborhood of each embedding. 
+Because exact matching can be needlessly rigid for a multimodal task like this, Top-$K$ retrieval ends up being our primary indicator of practical alignment quality. Rather than forcing a global one-to-one assignment, it tests the local neighbourhood around each embedding instead.
 
-For a given 3D query shape, we rank all 500 text embeddings based on their cosine distance (or Euclidean distance, depending on the space topology) from the query point. If the ground-truth text caption falls within the top $K$ nearest neighbors, the retrieval is considered successful. We report results for $K \in \{1, 5, 10\}$. 
+For a given 3D query shape, we rank all 500 text embeddings by cosine distance (or Euclidean distance, depending on the space's topology) from the query point. If the ground-truth caption lands within the top $K$ nearest neighbours, we count the retrieval as successful, and we report results for $K \in \{1, 5, 10\}$.
 
-This metric is particularly insightful for analyzing latent spaces. A high Top-5 or Top-10 score, even with a low Top-1 score, suggests that the underlying geometry of the modalities is successfully clustering similar concepts together, even if the absolute nearest neighbor is slightly noisy. As we move into the Optimal Transport framework in the next chapters, these retrieval metrics will clearly expose whether Gromov-Wasserstein distances succeed at preserving these semantic neighborhoods or if they completely collapse the space.
+This metric turns out to be particularly useful for reading latent spaces. A high Top-5 or Top-10 score alongside a lower Top-1 suggests the underlying geometry is still successfully clustering similar concepts together, even if the single nearest neighbour is a bit noisy. As we move into the Optimal Transport framework in the chapters ahead, these retrieval metrics will make it very clear whether Gromov-Wasserstein distances actually preserve these semantic neighbourhoods, or whether they collapse the space entirely.
 
 \section{Diagnostic Metrics}
 \label{sec:diagnostic_metrics}
 
-While Matching Accuracy and Top-$K$ Retrieval (Section~\ref{sec:metrics}) quantify \emph{how well} an alignment method performs, they offer no insight into \emph{why} a method succeeds or fails. To support the theoretical and diagnostic analysis carried out throughout Chapter~\ref{ch:gw_alignment} --- in particular, the thirteen-test ablation study and the structural non-isometry argument of Section~\ref{sec:why_gw_fails} --- this section formally introduces two complementary diagnostic tools: Centered Kernel Alignment, used to directly quantify the structural similarity between two representation spaces, and transport plan entropy, used to characterise the internal structure of a learned coupling matrix independently of its downstream retrieval accuracy.
+Matching Accuracy and Top-$K$ Retrieval (Section~\ref{sec:metrics}) tell us \emph{how well} an alignment method performs, but they're silent on \emph{why} a method succeeds or fails. To support the theoretical and diagnostic analysis running through Chapter~\ref{ch:gw_alignment} --- the thirteen-test ablation study in particular, and the structural non-isometry argument of Section~\ref{sec:why_gw_fails} --- this section formally introduces two complementary diagnostic tools: Centered Kernel Alignment, which directly quantifies structural similarity between two representation spaces, and transport plan entropy, which characterises the internal structure of a learned coupling matrix independently of whatever retrieval accuracy it happens to produce.
 
 \subsection{Centered Kernel Alignment (CKA)}
 \label{subsec:cka_definition}
 
-Centered Kernel Alignment (CKA), introduced by \textcite{kornblith2019similarity}, measures the similarity between two sets of representations of the same $n$ samples, even when the representations have different dimensionalities. Given two feature matrices $X \in \mathbb{R}^{n \times d_1}$ and $Y \in \mathbb{R}^{n \times d_2}$, and two kernel matrices $K = k(X,X)$ and $L = l(Y,Y)$ computed over the two representation spaces, CKA is defined via the Hilbert-Schmidt Independence Criterion (HSIC) \cite{gretton2005measuring}:
+Centered Kernel Alignment (CKA), introduced by \textcite{kornblith2019similarity}, measures the similarity between two sets of representations of the same $n$ samples, even when those representations have completely different dimensionalities. Given two feature matrices $X \in \mathbb{R}^{n \times d_1}$ and $Y \in \mathbb{R}^{n \times d_2}$, and two kernel matrices $K = k(X,X)$ and $L = l(Y,Y)$ computed over the two spaces, CKA is defined via the Hilbert-Schmidt Independence Criterion (HSIC) \cite{gretton2005measuring}:
 \begin{equation}
     \mathrm{CKA}(K, L) = \frac{\mathrm{HSIC}(K, L)}{\sqrt{\mathrm{HSIC}(K, K) \, \mathrm{HSIC}(L, L)}}
     \label{eq:cka}
 \end{equation}
-where $\mathrm{HSIC}(K, L) = \frac{1}{(n-1)^2} \mathrm{tr}(K H L H)$, and $H = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^\top$ is the centering matrix. In the special, computationally convenient case of a linear kernel ($K = XX^\top$, $L = YY^\top$), Equation~\ref{eq:cka} reduces to the closed-form expression:
+where $\mathrm{HSIC}(K, L) = \frac{1}{(n-1)^2} \mathrm{tr}(K H L H)$, and $H = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^\top$ is the centering matrix. In the special, computationally convenient case of a linear kernel ($K = XX^\top$, $L = YY^\top$), this reduces to a much simpler closed-form expression:
 \begin{equation}
     \mathrm{CKA}_{\mathrm{linear}}(X, Y) = \frac{\| Y^\top X \|_F^2}{\| X^\top X \|_F \, \| Y^\top Y \|_F}
     \label{eq:linear_cka}
 \end{equation}
-which is the variant used throughout this thesis. CKA is bounded in $[0, 1]$, with a score of $0$ indicating no structural correlation between the two representation spaces, and a score of $1$ indicating that the pairwise geometric relationships of one space are perfectly recoverable from the other, up to an orthogonal transformation and isotropic scaling. Crucially, unlike the Gromov-Wasserstein distance of Section~\ref{sec:gw_distance}, computing CKA requires the two representation sets to be sampled over the \emph{same} underlying set of $n$ objects (i.e. it requires known correspondences), making it unsuitable as an unsupervised \emph{alignment} tool, but ideally suited as a supervised \emph{diagnostic}: because it is computed directly on the known 3D-text anchor pairs, it provides a ground-truth measurement of how structurally similar the two \emph{unaligned} latent spaces already are, independently of any alignment method applied to them. This is precisely the role CKA plays in the theoretical analysis of Section~\ref{subsec:isometry_bottleneck}, where the low CKA score reported by \textcite{hadgi2025escaping} between raw PointNet and CLIP embeddings ($\approx 0.12$) is used as independent corroborating evidence for the absence of structural isometry inferred from our own Gromov-Wasserstein ablation results.
+which is the variant we use throughout this thesis. CKA is bounded in $[0, 1]$: a score of $0$ means no structural correlation between the two spaces at all, while a score of $1$ means the pairwise geometric relationships of one space are perfectly recoverable from the other, up to an orthogonal transformation and isotropic scaling. What's crucial here is that, unlike the Gromov-Wasserstein distance of Section~\ref{sec:gw_distance}, computing CKA requires the two representation sets to be sampled over the \emph{same} underlying set of $n$ objects --- it needs known correspondences to work at all. That rules it out as an unsupervised \emph{alignment} tool, but makes it ideally suited as a supervised \emph{diagnostic}: computed directly on the known 3D-text anchor pairs, it gives a ground-truth measurement of how structurally similar the two \emph{unaligned} latent spaces already are, independently of whatever alignment method gets applied to them afterward. That's exactly the role CKA plays in the theoretical analysis of Section~\ref{subsec:isometry_bottleneck}, where the low CKA score \textcite{hadgi2025escaping} report between raw PointNet and CLIP embeddings ($\approx 0.12$) serves as independent corroborating evidence for the absence of structural isometry we infer from our own Gromov-Wasserstein ablation results.
 
 \subsection{Transport Plan Entropy and Diagonal Concentration}
 \label{subsec:entropy_definition}
 
-A second diagnostic tool used extensively in the ablation study of Chapter~\ref{ch:gw_alignment} (Test 11, Section~\ref{subsec:library_analysis}) examines the internal structure of a learned transport plan $T \in \mathbb{R}^{n \times n}$ directly, independently of the retrieval accuracy it produces. Two complementary statistics are used.
+A second diagnostic tool, used extensively in the ablation study of Chapter~\ref{ch:gw_alignment} (Test 11, Section~\ref{subsec:library_analysis}), looks directly at the internal structure of a learned transport plan $T \in \mathbb{R}^{n \times n}$, independently of the retrieval accuracy it ends up producing. Two complementary statistics do the job here.
 
-\paragraph{Transport Plan Entropy.} As introduced in the entropic regularisation of Section~\ref{subsec:sinkhorn}, the (discrete) entropy of a transport plan is given by:
+\paragraph{Transport Plan Entropy.} As introduced back in the entropic regularisation of Section~\ref{subsec:sinkhorn}, the (discrete) entropy of a transport plan is:
 \begin{equation}
     H(T) = -\sum_{i,j} T_{ij} \log T_{ij}
     \label{eq:plan_entropy}
 \end{equation}
-A transport plan that concentrates all of its mass on a single, semantically correct permutation of matches (the ideal outcome for cross-modal retrieval) has minimal entropy: in the extreme case of a perfect permutation matrix, $H(T) = 0$. Conversely, a maximally uninformative transport plan --- one that spreads mass uniformly across every possible pairing, i.e. $T_{ij} = 1/n^2$ for all $i,j$ --- attains the theoretical maximum entropy $H_{\max} = \log(n^2)$. A learned transport plan whose entropy sits close to $H_{\max}$ is therefore statistically indistinguishable from random guessing, regardless of the retrieval accuracy computed from it: this is precisely the diagnostic signature used to characterise the failure of unsupervised Gromov-Wasserstein solvers in Test 11.
+A transport plan that concentrates all its mass on a single, semantically correct permutation of matches --- the ideal outcome for cross-modal retrieval --- has minimal entropy; in the extreme case of a perfect permutation matrix, $H(T) = 0$. A maximally uninformative plan, on the other hand, one that spreads mass uniformly across every possible pairing ($T_{ij} = 1/n^2$ for all $i,j$), hits the theoretical maximum entropy $H_{\max} = \log(n^2)$. A learned plan whose entropy sits close to that maximum is, statistically speaking, indistinguishable from random guessing, regardless of whatever retrieval accuracy gets computed from it --- and that's precisely the diagnostic signature we use to characterise the failure of unsupervised Gromov-Wasserstein solvers in Test 11.
 
-\paragraph{Diagonal-to-Uniform Concentration Ratio.} Because the ground-truth correspondence between a query set of $n$ 3D objects and their $n$ paired captions is, by construction, the identity permutation (query $i$ corresponds to caption $i$), a second, more interpretable diagnostic examines how much probability mass a transport plan places on its own diagonal relative to the uniform baseline:
+\paragraph{Diagonal-to-Uniform Concentration Ratio.} Since the ground-truth correspondence between a query set of $n$ 3D objects and their $n$ paired captions is, by construction, the identity permutation (query $i$ matches caption $i$), a second and more interpretable diagnostic looks at how much probability mass a transport plan puts on its own diagonal relative to the uniform baseline:
 \begin{equation}
     \rho(T) = \frac{\frac{1}{n}\sum_{i} T_{ii}}{\frac{1}{n^2}\sum_{i,j} T_{ij}}
     \label{eq:diagonal_ratio}
 \end{equation}
-which measures the mean diagonal mass of $T$ relative to what would be expected under a uniform, entirely uninformative coupling. A ratio of $\rho(T) = 1.0$ indicates a transport plan indistinguishable from uniform noise, while $\rho(T) > 1$ indicates a genuine (if imperfect) tendency to recover the correct correspondences. This ratio is reported alongside CCA+Affine's implicit transport structure and the unsupervised GW solvers' output plans in Section~\ref{subsec:library_analysis}, providing a direct, retrieval-metric-independent confirmation that unsupervised solvers fail to recover any meaningful structural signal.
+This measures the mean diagonal mass of $T$ relative to what a uniform, entirely uninformative coupling would produce. A ratio of $\rho(T) = 1.0$ means the transport plan is indistinguishable from uniform noise, while $\rho(T) > 1$ signals a genuine --- if imperfect --- tendency to recover the correct correspondences. We report this ratio alongside CCA+Affine's implicit transport structure and the unsupervised GW solvers' output plans in Section~\ref{subsec:library_analysis}, giving a direct, retrieval-metric-independent confirmation that the unsupervised solvers simply aren't recovering any meaningful structural signal.
