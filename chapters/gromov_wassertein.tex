@@ -27,8 +27,8 @@ Worth flagging up front: the anchor and sample counts used for the unsupervised 
 
 Pure $\mathcal{GW}$ relies exclusively on topological structure --- the relational distance matrices $C_X$ and $C_Y$ --- but Fused Gromov-Wasserstein (FGW) \cite{vayer2019optimal}, implemented here via the \gls{pot} library, adds a mechanism for combining structural matching with direct feature matching. The \gls{fgw} formulation uses a hyperparameter $\alpha \in [0, 1]$ to control the trade-off between the Wasserstein cost (feature alignment) and the Gromov-Wasserstein cost (structural alignment):
 \begin{equation}
-    \text{FGW}(X, Y) = (1 - \alpha)\,W(X, Y) + \alpha\,\mathcal{GW}(X, Y)
-    \label{eq:fgw}
+\text{FGW}(X, Y) = (1 - \alpha)\,W(X, Y) + \alpha\,\mathcal{GW}(X, Y)
+\label{eq:fgw}
 \end{equation}
 
 Since our modalities occupy disjoint spaces, a direct feature cost only makes sense once both are projected into a shared \gls{cca} subspace. We ran \gls{fgw} in the $k=50$ \gls{cca} subspace, swept $\alpha$ from 0 to 1, and found the best result at $\alpha = 0.2$ with 1,000 anchor pairs.
@@ -97,7 +97,7 @@ modality and no ground-truth correspondence is used during optimisation.
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{Alignment Method} & \textbf{Sup.} & \textbf{$n$ (samples)}
-    & \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
+& \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
 \midrule
 \multicolumn{7}{l}{\textit{Supervised Baseline (Upper Bound)}} \\
 CCA + Affine ($k = 50$)            & \checkmark & 30k & 13.5\% & 14.6\% & \textbf{35.7\%} & 46.4\% \\
@@ -114,7 +114,7 @@ FGW anchor-constrained (pen.=10)   & $\sim$     & 1k  & 3.6\%  & 3.6\%  & 4.4\% 
 \midrule
 \multicolumn{7}{l}{\textit{Random Baseline}} \\
 Independent Gaussian               & ---        & --- & $\approx$0.6\% & $\approx$0.6\%
-                                                      & $\approx$1.6\% & $\approx$2.0\% \\
+& $\approx$1.6\% & $\approx$2.0\% \\
 \bottomrule
 \end{tabular}%
 }
@@ -303,37 +303,64 @@ All four variants landed between $1.3\%$ and $1.5\%$ Top-5, statistically indist
 \paragraph{Test 13: Fine Epsilon Sweep in the Low Range.}
 Finally, the supervisor asked for a fine-grained sweep in the low epsilon regime, where \gls{lrgw} gets close to exact, un-regularised optimal transport --- the idea being that if excessive entropic smoothing were responsible for the failure, very small epsilon values ought to reveal it. We tested seven values, $\epsilon \in \{10^{-4}, 5 \cdot 10^{-4}, 10^{-3}, 5 \cdot 10^{-3}, 10^{-2}, 5 \cdot 10^{-2}, 10^{-1}\}$, at rank $r=20$ (the same as Test 3) on PointNet$\times$\gls{clip}, both post-CCA ($k=50$, seed$=0$) and on the raw $L_2$-normalised features for direct comparison with Test 12. The $\mathcal{GW}$ cost stayed perfectly static at $0.0392$ (post-CCA, Top-5 $=1.2\%$) and $0.4854$ (pre-CCA, Top-5 $=1.6\%$) across all seven values, with zero variation down to four decimal places ($\Delta\text{cost} = 0.0000$). Dropping the smoothing penalty by three orders of magnitude, from $0.1$ to $0.0001$, changed nothing whatsoever about the cost or the retrieval performance. This is about as clear a computational signature of a flat loss landscape as you're going to get: the solver isn't stuck because of excessive entropy --- it's converging to the same structural mapping because no better semantic alignment exists geometrically, even in the near-unregularised regime.
 
+Table~\ref{tab:eps_low_full} spells out every one of the seven values individually, side by side for the post-CCA and pre-CCA runs, rather than just the two extremes summarised above. The reason we bothered running the pre-CCA branch through the exact same fine-grained sweep --- rather than only checking it once at a single $\epsilon$, as Test 12 did --- is that Test 12 alone leaves a narrow gap open: it rules out the raw feature geometry as the problem at $\epsilon = 0.1$, but says nothing about whether some other $\epsilon$, closer to the un-regularised limit, might behave differently once the CCA projection is out of the picture entirely. This is precisely the pairing the supervisor asked for: apply the fine epsilon sweep to features that have never seen a CCA projection or an anchor pair, closing that gap directly instead of leaving it as an assumption.
+
+\begin{table}[htpb]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{$\epsilon$} & \textbf{Post-CCA Top-5} & \textbf{Post-CCA cost} & \textbf{Pre-CCA Top-5} & \textbf{Pre-CCA cost} \\
+\midrule
+$10^{-4}$          & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$5{\times}10^{-4}$ & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$10^{-3}$          & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$5{\times}10^{-3}$ & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$10^{-2}$          & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$5{\times}10^{-2}$ & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+$10^{-1}$          & 1.2\% & 0.0392 & 1.6\% & 0.4854 \\
+\bottomrule
+\end{tabular}
+\caption{Full seven-value breakdown of Test 13's fine epsilon sweep, run
+in parallel on post-CCA ($k=50$) and pre-CCA (raw, $L_2$-normalised)
+features at rank $r=20$. Both branches return numerically identical
+results across every value of $\epsilon$, down to four decimal places.}
+\label{tab:eps_low_full}
+\end{table}
+
+The two columns tell essentially the same story, just from two different starting points. Post-CCA, the cost sits at $0.0392$ regardless of $\epsilon$; pre-CCA, it sits at $0.4854$, again regardless of $\epsilon$ --- a higher absolute number, as expected given the raw features' much larger metric scale, but equally flat. Combined with Test 12, this closes the loop completely: removing every trace of supervision from the pipeline --- no CCA projection, no anchor pairs, and now confirmed across the full fine-grained regularisation range rather than at a single fixed $\epsilon$ --- still leaves the solver converged to the same uninformative optimum. Whatever is stopping GW from working here, it clearly isn't the CCA step, and it clearly isn't the choice of $\epsilon$ either.
+
 \begin{table}[H]
 \centering
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{clp{9cm}}
 \toprule
 \textbf{Test} & \textbf{Targeted Variable}
-    & \textbf{Conclusion / Alternative Ruled Out} \\
+& \textbf{Conclusion / Alternative Ruled Out} \\
 \midrule
 1  & Synthetic sanity check
-    & Implementation bug (93.4\% Top-5 on true isometry \checkmark) \\
+& Implementation bug (93.4\% Top-5 on true isometry \checkmark) \\
 2  & Self-GW on real features
-    & Data numerical issues (91.4\% match on self \checkmark) \\
+& Data numerical issues (91.4\% match on self \checkmark) \\
 3  & $\epsilon$ sweep ($0.001$--$5.0$, 8 values, $r=20$)
-    & Wrong regularisation (cost 0.0392 identical for all values) \\
+& Wrong regularisation (cost 0.0392 identical for all values) \\
 4  & Cost function (Euclidean vs.\ angular)
-    & Wrong distance metric (angular: 1.9\%, $18\times$ below baseline) \\
+& Wrong distance metric (angular: 1.9\%, $18\times$ below baseline) \\
 5  & Raw features + scale-matching
-    & Post-CCA distortion (raw features equally bad at 0.5\%) \\
+& Post-CCA distortion (raw features equally bad at 0.5\%) \\
 6  & Rank sweep ($r \in \{2 \ldots 200\}$, 7 values)
-    & Insufficient capacity (best rank=50 gives 2.4\%) \\
+& Insufficient capacity (best rank=50 gives 2.4\%) \\
 7  & Query set size ($500$--$2000$)
-    & Data scarcity (more data does not help) \\
+& Data scarcity (more data does not help) \\
 8  & CCA dimension ($k \in \{10 \ldots 100\}$)
-    & Wrong subspace (best $k$=20 gives 3.0\% vs.\ 30.1\% for CCA+Affine) \\
+& Wrong subspace (best $k$=20 gives 3.0\% vs.\ 30.1\% for CCA+Affine) \\
 9  & All 6 encoder pairs (3 seeds each)
-    & Encoder-specific artefact (1.1--1.7\% Top-5 uniformly, vs.\ 10.2--34.1\%
+& Encoder-specific artefact (1.1--1.7\% Top-5 uniformly, vs.\ 10.2--34.1\%
       for CCA+Affine) \\
 10 & POT vs.\ OTT-JAX libraries
-    & Library bug (both independently agree on same failure) \\
+& Library bug (both independently agree on same failure) \\
 11 & Transport plan structure
-    & Hidden signal (diagonal ratio 1.6$\times$ for the supervised baseline
+& Hidden signal (diagonal ratio 1.6$\times$ for the supervised baseline
       vs.\ 0.4--1.2$\times$ for LR-GW; raw entropy not directly comparable
       due to pseudo-plan construction) \\
 \midrule
@@ -341,11 +368,13 @@ Finally, the supervisor asked for a fine-grained sweep in the low epsilon regime
 supervisor instructions}} \\
 \midrule
 12 & LR-GW on raw pre-CCA features (4 variants)
-    & CCA filtering exploitable structure
+& CCA filtering exploitable structure
       (pre-CCA identical to post-CCA at $\approx$1.5\%) \\
-13 & Fine $\epsilon$ sweep ($10^{-4}$--$10^{-1}$, 7 values, $r=20$)
-    & Excessive smoothing masking solution
-      (cost perfectly stable to 4 decimal places) \\
+13 & Fine $\epsilon$ sweep ($10^{-4}$--$10^{-1}$, 7 values, $r=20$),
+      run on both post-CCA and pre-CCA features
+& Excessive smoothing masking solution, in either regime
+      (cost perfectly stable to 4 decimal places, both post-CCA at
+      0.0392 and pre-CCA at 0.4854) \\
 \bottomrule
 \end{tabular}%
 }
@@ -420,15 +449,15 @@ whatever CCA is doing, it is erasing a starting gap of six orders of
 magnitude down to nothing.
 
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=0.85\textwidth]{fig_scale_factors.pdf}
-  \caption{Median-ratio scale factor $s = \mathrm{med}(D_Y)/\mathrm{med}(D_X)$
+\centering
+\includegraphics[width=0.85\textwidth]{fig_scale_factors.pdf}
+\caption{Median-ratio scale factor $s = \mathrm{med}(D_Y)/\mathrm{med}(D_X)$
   across all six encoder pairs, shown on a logarithmic scale. Blue bars
   indicate $s < 1$ (3D space more dispersed than text); red bars indicate
-  $s > 1$ (text space more dispersed than 3D). The raw feature spaces
+$s > 1$ (text space more dispersed than 3D). The raw feature spaces
   operate on wildly mismatched metric scales, spanning roughly six orders
   of magnitude.}
-  \label{fig:scale_factors}
+\label{fig:scale_factors}
 \end{figure}
 
 According to Li et al.'s validated metric, which correlates strongly with Vision-Language Model (VLM) downstream performance ($R^2 = 0.43$ across $60+$ full training runs), this cost threshold flags our feature spaces as intrinsically low-compatibility. With no underlying structural homology to work with, the \gls{gw} solver has nothing geometric to latch onto --- the transport plan it produces is mathematically valid, but semantically meaningless.
@@ -449,7 +478,7 @@ number of anchor pairs used for supervised/semi-supervised penalty terms
 \begin{tabular}{llcccc}
 \toprule
 \textbf{Category} & \textbf{Method}
-    & \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
+& \textbf{Match} & \textbf{Top-1} & \textbf{Top-5} & \textbf{Top-10} \\
 \midrule
 \multicolumn{6}{l}{\textit{Unsupervised Optimal Transport}} \\
 & Sliced GW ($k$=20, 5k)            & 1.5\%  & 1.1\%  & 3.2\%           & 4.8\%  \\
@@ -467,7 +496,7 @@ number of anchor pairs used for supervised/semi-supervised penalty terms
 \midrule
 \multicolumn{6}{l}{\textit{Random Baseline}} \\
 & Independent Gaussian              & $\approx$0.6\% & $\approx$0.6\%
-                                    & $\approx$1.6\% & $\approx$2.0\% \\
+& $\approx$1.6\% & $\approx$2.0\% \\
 \bottomrule
 \end{tabular}%
 }
@@ -492,13 +521,13 @@ sophisticated --- which is really the whole story of this chapter in one
 picture.
 
 \begin{figure}[H]
-  \centering
-  \includegraphics[width=0.85\textwidth]{fig_method_ranking.pdf}
-  \caption{Top-5 retrieval accuracy across all tested alignment methods on
+\centering
+\includegraphics[width=0.85\textwidth]{fig_method_ranking.pdf}
+\caption{Top-5 retrieval accuracy across all tested alignment methods on
   PointNet $\times$ CLIP. The sharp drop between supervised and
   unsupervised/semi-supervised methods illustrates the central empirical
   finding of this thesis.}
-  \label{fig:method_ranking}
+\label{fig:method_ranking}
 \end{figure}
 
 Why does the \gls{cca} + Affine pipeline succeed where \gls{gw} fails? The affine mapping $T(x) = Rx + b$ strictly minimises the mathematical discrepancy between predefined semantic anchor pairs, completely overriding the natural global topology of the manifolds --- it doesn't need the 3D space to resemble the text space geometrically at all, because it just forces the correlation through supervised constraints instead.
