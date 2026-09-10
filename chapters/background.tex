@@ -1,12 +1,12 @@
 \chapter{Background and Related Work}
 \label{ch:background}
 
-This chapter lays the mathematical and theoretical groundwork needed to make sense of cross-modal 3D-text alignment. Section~\ref{sec:3d_representations} looks at how 3D objects are represented and at the deep architectures used to extract features from point clouds. Section~\ref{sec:encoders_background} introduces the pre-trained text and vision encoders used throughout this study. Section~\ref{sec:cross_modal} works through both supervised and unsupervised approaches to cross-modal alignment. Section~\ref{sec:ot_foundations} builds up the formal machinery of Optimal Transport, starting from the classical Monge-Kantorovich problem and arriving at its entropically regularised solvers. Section~\ref{sec:gw_distance} extends this machinery to the Gromov-Wasserstein distance and the variants used later in this thesis. Section~\ref{sec:related_3dtext} places this work within the wider landscape of 3D-language alignment research. Section~\ref{sec:gap_addressed} then closes the chapter by spelling out exactly what gap this thesis is trying to fill.
+This chapter lays the mathematical and theoretical groundwork needed to make sense of cross-modal 3D-text alignment. Section~\ref{sec:3d_representations} examines how 3D objects are represented and the deep architectures used to extract features from point clouds. Section~\ref{sec:encoders_background} introduces the pre-trained text and vision encoders used throughout this study. Section~\ref{sec:cross_modal} works through both supervised and unsupervised approaches to cross-modal alignment. Section~\ref{sec:ot_foundations} builds up the formal machinery of Optimal Transport, starting from the classical Monge-Kantorovich problem and arriving at its entropically regularised solvers. Section~\ref{sec:gw_distance} extends this machinery to the Gromov-Wasserstein distance and the variants used later in this thesis. Section~\ref{sec:related_3dtext} places this work within the wider landscape of 3D-language alignment research. Section~\ref{sec:gap_addressed} concludes the chapter by specifying the gap this thesis addresses.
 
 \section{3D Object Representations and Point Clouds}
 \label{sec:3d_representations}
 
-Two-dimensional images come with a built-in structure --- a regular grid of pixels --- that three-dimensional data simply doesn't have. 3D content can instead take several forms: volumetric voxel grids, polygonal meshes, implicit neural representations, or point clouds. Of these, point clouds are arguably the most fundamental, since they correspond directly to how sensors like LiDAR or depth cameras actually capture the physical world.
+Two-dimensional images come with a built-in structure --- a regular grid of pixels --- that three-dimensional data does not possess. 3D content can instead take several forms: volumetric voxel grids, polygonal meshes, implicit neural representations, or point clouds. Of these, point clouds are arguably the most fundamental, since they correspond directly to how sensors such as LiDAR or depth cameras capture the physical world.
 
 \subsection{Mathematical Properties of Point Clouds}
 \label{subsec:point_cloud_properties}
@@ -15,31 +15,31 @@ Formally, a 3D point cloud is an unordered set of $N$ spatial points:
 \begin{equation}
     P = \{\mathbf{p}_i \in \mathbb{R}^3\}_{i=1}^N
 \end{equation}
-where each point $\mathbf{p}_i = (x_i, y_i, z_i)^T$ gives its coordinates in Euclidean space. Points can also carry extra attributes --- surface normals, colour, and so on --- but the coordinates are what matter here.
+where each point $\mathbf{p}_i = (x_i, y_i, z_i)^T$ gives its coordinates in Euclidean space. Points can also carry additional attributes --- surface normals, colour, and so forth --- but the coordinates are what matter here.
 
-Neural networks that process point clouds have to contend with three properties baked into this representation:
+Neural networks that process point clouds must contend with three properties inherent to this representation:
 \begin{enumerate}
-    \item \textbf{Permutation Invariance:} a point cloud is a set, not a sequence, so the order in which points happen to be stored is meaningless. Any feature extractor $f(P)$ mapping the cloud to a global descriptor has to give the same output no matter how the points are shuffled:
+    \item \textbf{Permutation Invariance:} A point cloud is a set, not a sequence, so the order in which points are stored is meaningless. Any feature extractor $f(P)$ mapping the cloud to a global descriptor must produce the same output regardless of how the points are permuted:
     \begin{equation}
         f(\{\mathbf{p}_{\pi(1)}, \dots, \mathbf{p}_{\pi(N)}\}) = f(\{\mathbf{p}_1, \dots, \mathbf{p}_N\}), \quad \forall \pi \in \mathbb{S}_N
     \end{equation}
     where $\mathbb{S}_N$ is the symmetric group of permutations of degree $N$.
-    \item \textbf{Geometric Transformation Invariance:} an object's semantic identity doesn't change under rigid transformations --- global rotations $R \in \mathrm{SO}(3)$ or translations $\mathbf{t} \in \mathbb{R}^3$ shouldn't alter what the network thinks it's looking at.
-    \item \textbf{Sparsity and Non-Euclidean Topology:} point density varies wildly across a cloud, and there's no regular grid underneath to lean on, unlike pixels in an image.
+    \item \textbf{Geometric Transformation Invariance:} An object's semantic identity does not change under rigid transformations --- global rotations $R \in \mathrm{SO}(3)$ or translations $\mathbf{t} \in \mathbb{R}^3$ should not alter what the network perceives.
+    \item \textbf{Sparsity and Non-Euclidean Topology:} Point density varies considerably across a cloud, and no regular grid underlies the representation, unlike pixels in an image.
 \end{enumerate}
 
 \subsection{Point Cloud Backbone Architectures}
 \label{subsec:point_cloud_backbones}
 
-This thesis relies on two architecturally quite different backbones to map point clouds into global shape embeddings $\mathbf{z}_{3D} \in \mathbb{R}^{d_{3D}}$.
+This thesis relies on two architecturally distinct backbones to map point clouds into global shape embeddings $\mathbf{z}_{3D} \in \mathbb{R}^{d_{3D}}$.
 
-\paragraph{PointNet.} Introduced by \textcite{qi2017pointnet}, PointNet processes unordered point sets directly, learning point-wise features through shared Multi-Layer Perceptrons (MLPs) before pooling them into a single global descriptor via max-pooling. The whole thing can be written as:
+\paragraph{PointNet.} Introduced by \textcite{qi2017pointnet}, PointNet processes unordered point sets directly, learning point-wise features through shared Multi-Layer Perceptrons (MLPs) before pooling them into a single global descriptor via max-pooling. This can be written as:
 \begin{equation}
     f(P) = \gamma \left( \max_{\mathbf{p}_i \in P} \left\{ h(\mathbf{p}_i) \right\} \right)
 \end{equation}
-where $h: \mathbb{R}^3 \to \mathbb{R}^{d_k}$ and $\gamma: \mathbb{R}^{d_k} \to \mathbb{R}^{d_{3D}}$ are non-linear \gls{mlp} transformations, and $\max$ is the element-wise maximum taken over all $N$ feature vectors. We use a pre-trained PointNet backbone throughout, producing 1024-dimensional global features ($d_{3D} = 1024$).
+where $h: \mathbb{R}^3 \to \mathbb{R}^{d_k}$ and $\gamma: \mathbb{R}^{d_k} \to \mathbb{R}^{d_{3D}}$ are non-linear \gls{mlp} transformations, and $\max$ denotes the element-wise maximum taken over all $N$ feature vectors. A pre-trained PointNet backbone is used throughout, producing 1024-dimensional global features ($d_{3D} = 1024$).
 
-\paragraph{Sparse Convolutional Networks (SparseConv).} Dense volumetric 3D convolutions scale as $\mathcal{O}(L^3)$ in memory, which becomes unworkable fast. Sparse Convolutional Networks \cite{graham20183d, choy20194d} sidestep this by discretising the point cloud onto a high-resolution voxel grid and only computing convolutions where there's actually something to convolve --- the non-empty coordinate set $\mathcal{C}_{in}$:
+\paragraph{Sparse Convolutional Networks (SparseConv).} Dense volumetric 3D convolutions scale as $\mathcal{O}(L^3)$ in memory, which quickly becomes computationally prohibitive. Sparse Convolutional Networks \cite{graham20183d, choy20194d} address this by discretising the point cloud onto a high-resolution voxel grid and computing convolutions only where there is content to convolve --- the non-empty coordinate set $\mathcal{C}_{in}$:
 \begin{equation}
     \mathbf{y}_{\mathbf{u}} = \sum_{\mathbf{k} \in K} W_{\mathbf{k}} \mathbf{x}_{\mathbf{u} + \mathbf{k}}, \quad \forall (\mathbf{u} + \mathbf{k}) \in \mathcal{C}_{in}
 \end{equation}
@@ -49,26 +49,26 @@ where $K$ is the convolution kernel offset grid and $W_{\mathbf{k}}$ are the ker
 \section{Language and Vision Encoders}
 \label{sec:encoders_background}
 
-Cross-modal alignment between 3D shapes and text requires high-dimensional latent representations of the text side too, extracted from pre-trained models. This thesis pulls in both uni-modal transformer language models and a multimodal vision-language architecture, precisely to see how different pre-training objectives shape the resulting latent geometry.
+Cross-modal alignment between 3D shapes and text requires high-dimensional latent representations of the text modality as well, extracted from pre-trained models. This thesis employs both uni-modal transformer language models and a multimodal vision-language architecture, specifically to examine how different pre-training objectives shape the resulting latent geometry.
 
 \subsection{Transformer Language Models: BERT and RoBERTa}
 \label{subsec:text_encoders}
 
-The Transformer, introduced by \textcite{vaswani2017attention}, changed NLP by replacing recurrence with multi-head self-attention as the mechanism for modelling relationships between tokens. 
+The Transformer architecture, introduced by \textcite{vaswani2017attention}, transformed NLP by replacing recurrence with multi-head self-attention as the mechanism for modelling relationships between tokens.
 
-\paragraph{BERT (Bidirectional Encoder Representations from Transformers).} 
-\textcite{devlin2019bert}'s \gls{bert} pre-trains bidirectional representations via Masked Language Modeling (MLM) and Next Sentence Prediction (NSP). We use the \texttt{bert-base-uncased} architecture and take the sentence-level embedding $\mathbf{z}_{text} \in \mathbb{R}^{768}$ straight from the pooler output attached to the classification token.
+\paragraph{BERT (Bidirectional Encoder Representations from Transformers).}
+Introduced by \textcite{devlin2019bert}, \gls{bert} pre-trains bidirectional representations via Masked Language Modeling (MLM) and Next Sentence Prediction (NSP). We use the \texttt{bert-base-uncased} architecture and obtain the sentence-level embedding $\mathbf{z}_{text} \in \mathbb{R}^{768}$ from the pooler output attached to the classification token.
 
-\paragraph{RoBERTa (Robustly Optimized BERT Approach).} 
-\textcite{liu2019roberta} made the case that BERT had been significantly undertrained, and \gls{roberta} was the fix: drop the \gls{nsp} objective, switch to dynamic masking, use much larger batches, and scale the training corpus by roughly an order of magnitude. We use \texttt{roberta-base} here, which gives dense contextual representations $\mathbf{z}_{text} \in \mathbb{R}^{768}$ through its own pooler output.
+\paragraph{RoBERTa (Robustly Optimized BERT Approach).}
+\textcite{liu2019roberta} argued that BERT had been significantly undertrained, and \gls{roberta} addresses this: the \gls{nsp} objective is removed, dynamic masking is introduced, larger batches are used, and the training corpus is scaled by roughly an order of magnitude. We use \texttt{roberta-base} here, which produces dense contextual representations $\mathbf{z}_{text} \in \mathbb{R}^{768}$ through its own pooler output.
 
 \subsection{Multimodal Vision-Language Models: OpenCLIP}
 \label{subsec:clip_encoders}
 
-Language models trained on text alone pick up structure from linguistic co-occurrence. Vision-language models are different --- their text representations are shaped to align with visual semantics from the start.
+Language models trained on text alone acquire structure from linguistic co-occurrence. Vision-language models differ in that their text representations are shaped to align with visual semantics from the outset.
 
 \paragraph{CLIP and OpenCLIP.}
-\textcite{radford2021learning}'s Contrastive Language-Image Pre-training (CLIP), later open-sourced as OpenCLIP \cite{cherti2023reproducible}, trains a visual encoder and a text encoder jointly using a symmetric contrastive loss (InfoNCE) over hundreds of millions of image-caption pairs. Given a batch of $B$ paired images $\mathbf{I}$ and texts $\mathbf{T}$, it computes normalised feature embeddings $\mathbf{v}_i$ and $\mathbf{t}_j$, and the contrastive objective pushes cosine similarities in the right direction:
+Contrastive Language-Image Pre-training (CLIP), introduced by \textcite{radford2021learning} and later open-sourced as OpenCLIP \cite{cherti2023reproducible}, trains a visual encoder and a text encoder jointly using a symmetric contrastive loss (InfoNCE) over hundreds of millions of image-caption pairs. Given a batch of $B$ paired images $\mathbf{I}$ and texts $\mathbf{T}$, the model computes normalised feature embeddings $\mathbf{v}_i$ and $\mathbf{t}_j$, and the contrastive objective adjusts cosine similarities accordingly:
 \begin{equation}
 \mathcal{L}_{\mathrm{InfoNCE}} = -\frac{1}{2B} \sum_{i=1}^B \left(
     \log \frac{\exp(\mathbf{v}_i^T \mathbf{t}_i / \tau)}
@@ -79,20 +79,20 @@ Language models trained on text alone pick up structure from linguistic co-occur
 \end{equation}
 where $\tau$ is a learnable temperature.
 
-Because OpenCLIP's text embeddings have already been pre-aligned with 2D visual structures, they arrive with a kind of spatial awareness baked in, which makes them an appealing target for 3D alignment. We use the large \texttt{ViT-bigG-14} variant, pre-trained on \texttt{laion2b\_s39b\_b160k}, giving 1280-dimensional text features. Only the text encoder is used anywhere in this pipeline --- the visual tower never comes into play. This lets us tap into the visual grounding implicit in \gls{clip}'s text space without ever touching an actual 2D image.
+Because OpenCLIP's text embeddings are already aligned with 2D visual structures, they carry an inherent spatial grounding that makes them a natural candidate for 3D alignment. We use the large \texttt{ViT-bigG-14} variant, pre-trained on \texttt{laion2b\_s39b\_b160k}, yielding 1280-dimensional text features. Only the text encoder is used within this pipeline; the visual tower is never invoked. This allows the visual grounding implicit in \gls{clip}'s text space to be leveraged without processing any actual 2D image.
 
 \section{Cross-Modal Alignment}
 \label{sec:cross_modal}
 
-Once 3D and text encoders have each produced their own high-dimensional representations, the real problem starts: how do you bridge two mathematically unrelated spaces? Broadly, there are two families of answers. Supervised methods lean on explicitly paired anchor examples to learn a mapping. Unsupervised methods try to find alignment purely from intrinsic structure, without any labels at all.
+Once 3D and text encoders have each produced their own high-dimensional representations, the central problem becomes bridging two mathematically unrelated spaces. Broadly, two families of approaches address this. Supervised methods rely on explicitly paired anchor examples to learn a mapping. Unsupervised methods attempt to recover alignment purely from intrinsic structure, without any labels.
 
 \subsection{Supervised Alignment Methods}
 \label{subsec:supervised_alignment}
 
-Supervised alignment assumes you have a set of explicitly paired samples --- anchors. Let $X \in \mathbb{R}^{n \times d_1}$ and $Y \in \mathbb{R}^{n \times d_2}$ be the 3D and text feature matrices for $n$ such anchor pairs.
+Supervised alignment presupposes a set of explicitly paired samples, referred to as anchors. Let $X \in \mathbb{R}^{n \times d_1}$ and $Y \in \mathbb{R}^{n \times d_2}$ denote the 3D and text feature matrices for $n$ such anchor pairs.
 
 \paragraph{Canonical Correlation Analysis (CCA) and Affine Transformations.}
-\textcite{hadgi2025escaping}'s zero-shot pipeline works in two linear steps. First, a Canonical Correlation Analysis (CCA) is fitted on the anchor pairs via a fast SVD implementation, producing projection matrices $W_X \in \mathbb{R}^{d_1 \times k}$ and $W_Y \in \mathbb{R}^{d_2 \times k}$ that push both modalities into a shared, noise-filtered $k$-dimensional subspace. We fix $k=50$ throughout. The projected features are:
+The zero-shot pipeline proposed by \textcite{hadgi2025escaping} proceeds in two linear steps. First, a Canonical Correlation Analysis (CCA) is fitted on the anchor pairs via a fast SVD implementation, producing projection matrices $W_X \in \mathbb{R}^{d_1 \times k}$ and $W_Y \in \mathbb{R}^{d_2 \times k}$ that project both modalities into a shared, noise-filtered $k$-dimensional subspace. We fix $k=50$ throughout. The projected features are:
 \begin{equation}
     X^r = X W_X, \quad Y^r = Y W_Y
 \end{equation}
@@ -101,121 +101,121 @@ Second, an affine transformation is fitted via least-squares on the projected an
 \begin{equation}
     T(X^r) = R X^r + b
 \end{equation}
-CCA filters out modality-specific noise, the affine map handles the translation, and together they reveal --- or fail to reveal --- whether independently trained spaces share some underlying geometry.
+\gls{cca} filters out modality-specific noise, and the affine map handles the residual translation; together, they reveal --- or fail to reveal --- whether independently trained spaces share an underlying geometry.
 
 \subsection{Unsupervised and Optimal Transport Methods}
 \label{subsec:unsupervised_alignment}
 
-Unsupervised alignment drops the requirement of paired anchors entirely. Rather than minimising distances between known correspondences, it tries to align the two spaces globally by matching their internal geometric structure. The main mathematical tool for this is Optimal Transport (OT), and specifically its Gromov-Wasserstein (GW) formulation, whose formal foundations are worked out over the rest of this chapter.
+Unsupervised alignment dispenses with the requirement of paired anchors entirely. Rather than minimising distances between known correspondences, it seeks to align the two spaces globally by matching their internal geometric structure. The principal mathematical tool for this purpose is Optimal Transport (OT), and specifically its Gromov-Wasserstein (GW) formulation, whose formal foundations are developed over the remainder of this chapter.
 
-Unlike a supervised linear map, \gls{gw} asks a structural question: do the pairwise distance matrices of the 3D space and the text space share the same shape? A key theoretical fact makes this precise --- the \gls{gw} distance is exactly zero if and only if the two spaces are perfectly isometric, i.e.\ related by a strict distance-preserving map. 
+Unlike a supervised linear map, \gls{gw} poses a structural question: do the pairwise distance matrices of the 3D space and the text space share the same shape? A key theoretical result makes this precise --- the \gls{gw} distance is exactly zero if and only if the two spaces are perfectly isometric, i.e.\ related by a strict distance-preserving map.
 
-Applying this to independently trained multimodal spaces runs into a practical snag, though: 3D and text feature spaces often live on wildly different metric scales. \textcite{li2026scale}'s median-ratio scale-matching offers one fix, normalising via a factor computed from intra-domain median distances, $s = \mathrm{med}(\mathcal{D}_Y) / \mathrm{med}(\mathcal{D}_X)$, so both spaces are artificially rescaled to a common magnitude before any relational alignment is attempted.
+Applying this to independently trained multimodal spaces encounters a practical difficulty, however: 3D and text feature spaces often occupy substantially different metric scales. The median-ratio scale-matching introduced by \textcite{li2026scale} offers one solution, normalising via a factor computed from intra-domain median distances, $s = \mathrm{med}(\mathcal{D}_Y) / \mathrm{med}(\mathcal{D}_X)$, so that both spaces are rescaled to a common magnitude before any relational alignment is attempted.
 
 \section{Optimal Transport Foundations}
 \label{sec:ot_foundations}
 
-Before getting to the Gromov-Wasserstein formulation this thesis actually uses, it helps to lay out the classical OT theory it grows out of. Standard OT compares two probability distributions living in the \emph{same} metric space, and it's where the vocabulary --- couplings, transport plans, marginal constraints --- and the computational tools --- entropic regularisation, Sinkhorn iterations --- used later in Section~\ref{sec:gw_distance} all come from.
+Before addressing the Gromov-Wasserstein formulation employed throughout this thesis, it is useful to establish the classical OT theory from which it derives. Standard OT compares two probability distributions residing in the \emph{same} metric space, and it is the source of the vocabulary --- couplings, transport plans, marginal constraints --- and the computational tools --- entropic regularisation, Sinkhorn iterations --- used later in Section~\ref{sec:gw_distance}.
 
 \subsection{The Monge and Kantorovich Formulations}
 \label{subsec:monge_kantorovich}
 
-Optimal Transport goes back to Monge in 1781, who framed the problem as moving a pile of earth into a target shape at minimum cost. Given a source distribution $\mu$ and target $\nu$ over a shared space $\mathcal{X}$, the \emph{Monge formulation} looks for a deterministic map $T: \mathcal{X} \to \mathcal{X}$ pushing $\mu$ forward onto $\nu$ (written $T_\# \mu = \nu$) while minimising a transport cost $c(x, T(x))$:
+Optimal Transport originates with Monge in 1781, who framed the problem as moving a pile of earth into a target shape at minimum cost. Given a source distribution $\mu$ and target $\nu$ over a shared space $\mathcal{X}$, the \emph{Monge formulation} seeks a deterministic map $T: \mathcal{X} \to \mathcal{X}$ pushing $\mu$ forward onto $\nu$ (written $T_\# \mu = \nu$) while minimising a transport cost $c(x, T(x))$:
 \begin{equation}
     \inf_{T: \, T_\# \mu = \nu} \int_{\mathcal{X}} c(x, T(x)) \, d\mu(x)
     \label{eq:monge}
 \end{equation}
-This turns out to be a genuinely awkward problem to work with. For many pairs of distributions, no valid map $T$ even exists --- if $\mu$ is concentrated at a single point and $\nu$ isn't, there's simply no way to split that point's mass across multiple destinations. And even where a solution does exist, the feasible set is highly non-convex, which makes the problem intractable both analytically and numerically \parencite{villani2009optimal}.
+This formulation is mathematically difficult to work with. For many pairs of distributions, no valid map $T$ exists --- if $\mu$ is concentrated at a single point and $\nu$ is not, there is no way to split that point's mass across multiple destinations. Even where a solution does exist, the feasible set is highly non-convex, rendering the problem intractable both analytically and numerically \parencite{villani2009optimal}.
 
-Kantorovich's 1942 relaxation, as formalised by \textcite{villani2009optimal}, fixes this by replacing the deterministic map $T$ with a probabilistic \emph{coupling} $\pi$ --- a joint distribution over $\mathcal{X} \times \mathcal{X}$ whose marginals recover $\mu$ and $\nu$. This gives the \emph{Kantorovich formulation}:
+Kantorovich's 1942 relaxation, as formalised by \textcite{villani2009optimal}, addresses this by replacing the deterministic map $T$ with a probabilistic \emph{coupling} $\pi$ --- a joint distribution over $\mathcal{X} \times \mathcal{X}$ whose marginals recover $\mu$ and $\nu$. This yields the \emph{Kantorovich formulation}:
 \begin{equation}
     W_c(\mu, \nu) = \inf_{\pi \in \Pi(\mu, \nu)} \int_{\mathcal{X} \times \mathcal{X}} c(x, y) \, d\pi(x, y)
     \label{eq:kantorovich}
 \end{equation}
-where $\Pi(\mu, \nu)$ is the set of all couplings with marginals $\mu$ and $\nu$. The payoff is that this is now a linear program --- the objective is linear in $\pi$, the constraint set is convex --- so a solution is always guaranteed to exist, unlike in the Monge case. When the cost is a distance raised to the power $p$, $c(x,y) = d(x,y)^p$, the resulting quantity is the \emph{$p$-Wasserstein distance}:
+where $\Pi(\mu, \nu)$ is the set of all couplings with marginals $\mu$ and $\nu$. The relaxation renders this a linear program --- the objective is linear in $\pi$, and the constraint set is convex --- so a solution is guaranteed to exist, in contrast to the Monge formulation. When the cost is a distance raised to the power $p$, $c(x,y) = d(x,y)^p$, the resulting quantity is the \emph{$p$-Wasserstein distance}:
 \begin{equation}
     W_p(\mu, \nu) = \left( \inf_{\pi \in \Pi(\mu, \nu)} \int d(x,y)^p \, d\pi(x,y) \right)^{1/p}
     \label{eq:wasserstein}
 \end{equation}
-which is a genuine metric on the space of probability distributions, and the theoretical foundation everything in modern computational OT is built on \parencite{peyre2019computational}.
+which constitutes a genuine metric on the space of probability distributions, and the theoretical foundation on which modern computational OT is built \parencite{peyre2019computational}.
 
-For finite, empirical distributions --- exactly the setting for the 3D and text embeddings used throughout this thesis --- the coupling $\pi$ becomes an $n \times m$ non-negative matrix $T$, and the Kantorovich problem turns into a discrete linear program:
+For finite, empirical distributions --- precisely the setting for the 3D and text embeddings used throughout this thesis --- the coupling $\pi$ becomes an $n \times m$ non-negative matrix $T$, and the Kantorovich problem becomes a discrete linear program:
 \begin{equation}
     W_c(\mu, \nu) = \min_{T \in \Pi(\mathbf{a}, \mathbf{b})} \sum_{i,j} C_{ij} \, T_{ij}
     \label{eq:discrete_ot}
 \end{equation}
-where $C_{ij} = c(x_i, y_j)$ is the pairwise cost matrix and $\mathbf{a}$, $\mathbf{b}$ are the (usually uniform) marginal weights over the $n$ source and $m$ target samples. Solving this exactly via linear programming costs $\mathcal{O}(n^3 \log n)$ when $n=m$ --- fine for small problems, but this quickly becomes unworkable once $n$ climbs into the tens of thousands, which is exactly the regime this thesis's experiments live in.
+where $C_{ij} = c(x_i, y_j)$ is the pairwise cost matrix and $\mathbf{a}$, $\mathbf{b}$ are the (typically uniform) marginal weights over the $n$ source and $m$ target samples. Solving this exactly via linear programming scales at $\mathcal{O}(n^3 \log n)$ when $n=m$. This is manageable for small problems, but becomes computationally prohibitive once $n$ reaches the tens of thousands, precisely the regime in which this thesis's experiments operate.
 
 \subsection{Entropic Regularization and the Sinkhorn Algorithm}
 \label{subsec:sinkhorn}
 
-\textcite{cuturi2013sinkhorn} found a way around the cubic cost of exact OT: add an entropic regularisation term to the Kantorovich objective, which discourages overly sparse, deterministic transport plans in favour of smoother, more diffuse ones:
+\textcite{cuturi2013sinkhorn} addressed the cubic cost of exact OT by adding an entropic regularisation term to the Kantorovich objective, which discourages overly sparse, deterministic transport plans in favour of smoother, more diffuse ones:
 \begin{equation}
     W_c^\epsilon(\mu, \nu) = \min_{T \in \Pi(\mathbf{a}, \mathbf{b})} \sum_{i,j} C_{ij} \, T_{ij} - \epsilon \, H(T)
     \label{eq:entropic_ot}
 \end{equation}
-where $H(T) = -\sum_{i,j} T_{ij} (\log T_{ij} - 1)$ is the plan's entropy and $\epsilon > 0$ controls the regularisation strength. Push $\epsilon \to 0$ and this recovers the original, unregularised OT problem; push $\epsilon \to \infty$ and the optimal plan degenerates to the fully uniform independence coupling $T_{ij} = a_i b_j$.
+where $H(T) = -\sum_{i,j} T_{ij} (\log T_{ij} - 1)$ is the plan's entropy and $\epsilon > 0$ controls the regularisation strength. As $\epsilon \to 0$, this recovers the original, unregularised OT problem; as $\epsilon \to \infty$, the optimal plan degenerates to the fully uniform independence coupling $T_{ij} = a_i b_j$.
 
-What makes this formulation genuinely useful in practice is that its solution has a closed form: $T^\star = \mathrm{diag}(u) \, K \, \mathrm{diag}(v)$, where $K = \exp(-C/\epsilon)$ is the elementwise Gibbs kernel of the cost matrix, and $u$, $v$ are non-negative scaling vectors found by alternately rescaling the rows and columns of $K$ until they match the target marginals $\mathbf{a}$ and $\mathbf{b}$. This is the \emph{Sinkhorn-Knopp algorithm} \cite{cuturi2013sinkhorn}, and each iteration boils down to a handful of matrix-vector products --- $\mathcal{O}(n^2)$ per iteration, a big improvement over the $\mathcal{O}(n^3 \log n)$ of exact linear programming, and one that parallelises cleanly on a GPU.
+This formulation is practically useful because its solution admits a closed form: $T^\star = \mathrm{diag}(u) \, K \, \mathrm{diag}(v)$, where $K = \exp(-C/\epsilon)$ is the elementwise Gibbs kernel of the cost matrix, and $u$, $v$ are non-negative scaling vectors obtained by alternately rescaling the rows and columns of $K$ until they match the target marginals $\mathbf{a}$ and $\mathbf{b}$. This is the \emph{Sinkhorn-Knopp algorithm} \cite{cuturi2013sinkhorn}, and each iteration reduces to a small number of matrix-vector products --- $\mathcal{O}(n^2)$ per iteration, a substantial improvement over the $\mathcal{O}(n^3 \log n)$ of exact linear programming, and one that parallelises efficiently on a GPU.
 
-This Sinkhorn machinery is what sits underneath the \texttt{LRSinkhorn} sub-solver used by the Low-Rank Gromov-Wasserstein implementation of Section~\ref{subsec:gw_variants}, and it runs throughout the ablation study of Chapter~\ref{ch:gw_alignment}: since the (non-convex) Gromov-Wasserstein problem is solved by iteratively linearising it into a sequence of ordinary entropic OT sub-problems --- each handled via Sinkhorn iterations --- the regularisation parameter $\epsilon$ introduced here is exactly the same hyperparameter swept in Tests 3 and 13 of the diagnostic ablation study (Sections~\ref{subsec:hyperparameter_sweeps} and~\ref{subsec:advanced_verifications}).
+This Sinkhorn machinery underlies the \texttt{LRSinkhorn} sub-solver used by the Low-Rank Gromov-Wasserstein implementation of Section~\ref{subsec:gw_variants}, and it recurs throughout the ablation study of Chapter~\ref{ch:gw_alignment}: since the (non-convex) Gromov-Wasserstein problem is solved by iteratively linearising it into a sequence of ordinary entropic OT sub-problems --- each handled via Sinkhorn iterations --- the regularisation parameter $\epsilon$ introduced here is exactly the same hyperparameter swept in Tests 3 and 13 of the diagnostic ablation study (Sections~\ref{subsec:hyperparameter_sweeps} and~\ref{subsec:advanced_verifications}).
 
 \section{Gromov-Wasserstein Distance}
 \label{sec:gw_distance}
 
-Standard Optimal Transport, as laid out in Section~\ref{sec:ot_foundations}, needs a direct cost matrix between two distributions living in the \emph{same} metric space. That assumption breaks immediately for us: 3D and text representations from independent encoders sit in different dimensions entirely ($d_1 = 1024$ versus $d_2 = 1280$, for instance), with no natural cross-domain distance to speak of. The Gromov-Wasserstein (GW) distance sidesteps this by comparing intra-domain geometric structure instead of features directly.
+Standard Optimal Transport, as presented in Section~\ref{sec:ot_foundations}, requires a direct cost matrix between two distributions residing in the \emph{same} metric space. This assumption does not hold for the present setting: 3D and text representations from independent encoders occupy entirely different dimensions ($d_1 = 1024$ versus $d_2 = 1280$, for instance), with no natural cross-domain distance available. The Gromov-Wasserstein (GW) distance circumvents this by comparing intra-domain geometric structure instead of features directly.
 
 \subsection{Definition and Properties}
 \label{subsec:gw_definition}
 
-Let $(X, d_X, \mu_X)$ and $(Y, d_Y, \mu_Y)$ be two metric measure spaces, with $d_X$, $d_Y$ intra-domain distance metrics (cosine or Euclidean, in our case) and $\mu_X$, $\mu_Y$ probability measures over the samples. Gromov-Wasserstein looks for a probabilistic transport plan $T \in \Pi(\mu_X, \mu_Y)$ minimising the discrepancy between pairwise distances in $X$ and the corresponding pairwise distances in $Y$:
+Let $(X, d_X, \mu_X)$ and $(Y, d_Y, \mu_Y)$ be two metric measure spaces, with $d_X$, $d_Y$ intra-domain distance metrics (cosine or Euclidean, in our case) and $\mu_X$, $\mu_Y$ probability measures over the samples. Gromov-Wasserstein seeks a probabilistic transport plan $T \in \Pi(\mu_X, \mu_Y)$ minimising the discrepancy between pairwise distances in $X$ and the corresponding pairwise distances in $Y$:
 \begin{equation}
     \mathcal{GW}(X, Y) = \inf_{T \in \Pi(\mu_X, \mu_Y)} \sum_{i,j} \sum_{k,l} L\Big( d_X(x_i, x_j), d_Y(y_k, y_l) \Big) T_{i,k} T_{j,l}
 \end{equation}
-where $L$ is typically the squared error, $L(a,b) = \|a - b\|^2$, and $T_{i,k}$ is the mass moved from $x_i$ to $y_k$. Worth pausing on how this differs from the standard OT objective of Equation~\ref{eq:discrete_ot}: standard OT compares $x_i$ and $y_j$ \emph{directly} through a shared cost $C_{ij}$, whereas the GW objective is \emph{quadratic} in $T$, because it's comparing pairs of intra-domain distances rather than cross-domain point pairs. That quadratic structure is exactly what lets GW operate across heterogeneous, non-comparable spaces --- at the price of a much harder, non-convex optimisation problem.
+where $L$ is typically the squared error, $L(a,b) = \|a - b\|^2$, and $T_{i,k}$ is the mass moved from $x_i$ to $y_k$. This differs from the standard OT objective of Equation~\ref{eq:discrete_ot} in an important respect: standard OT compares $x_i$ and $y_j$ \emph{directly} through a shared cost $C_{ij}$, whereas the GW objective is \emph{quadratic} in $T$, since it compares pairs of intra-domain distances rather than cross-domain point pairs. This quadratic structure is precisely what enables GW to operate across heterogeneous, non-comparable spaces, at the cost of a substantially harder, non-convex optimisation problem.
 
-\textcite{vayer2019optimal} proved the defining theoretical fact about the Gromov-Wasserstein distance: it hinges entirely on structural isometry. $\mathcal{GW}(X, Y)$ is exactly zero if and only if $X$ and $Y$ are perfectly isometric --- if there's a mapping between them that preserves every pairwise distance. When 3D and text latent spaces, trained independently, don't share a closely matching topological structure, the \gls{gw} solver has nothing to latch onto, and the optimisation collapses into uninformative, high-entropy local minima.
+\textcite{vayer2019optimal} established the defining theoretical result concerning the Gromov-Wasserstein distance: it depends entirely on structural isometry. $\mathcal{GW}(X, Y)$ is exactly zero if and only if $X$ and $Y$ are perfectly isometric --- if a mapping between them exists that preserves every pairwise distance. When 3D and text latent spaces, trained independently, do not share a closely matching topological structure, the \gls{gw} solver has no reliable structure to exploit, and the optimisation collapses into uninformative, high-entropy local minima.
 
 \subsection{Variants: SGW, FGW, LR-GW}
 \label{subsec:gw_variants}
 
-The standard Gromov-Wasserstein formulation is expensive to solve, non-convex and quadratic, running at $\mathcal{O}(n^3)$. Getting it to scale to the thousands of samples needed for robust 3D-text alignment requires some approximations, and this thesis relies on three:
+The standard Gromov-Wasserstein formulation is computationally expensive, non-convex, and quadratic, scaling at $\mathcal{O}(n^3)$. Scaling it to the thousands of samples required for robust 3D-text alignment necessitates approximations; this thesis relies on three.
 
 \paragraph{Sliced Gromov-Wasserstein (SGW) and RISGW.}
-\textcite{vayer2019optimal}'s \gls{sgw} projects the high-dimensional spaces onto 1D lines, using a set of random unit vectors: points are projected, sorted, and matched by comparing 1D orderings, which cuts the computational cost dramatically. Rotation-Invariant SGW (RISGW) builds on this by explicitly optimising a rotation matrix $\Delta$ on the Stiefel manifold to find the projection directions that minimise the \gls{sgw} cost. A Semi-Supervised variant, SS-RISGW, adds an anchor penalty term to steer the rotation: $\mathcal{L}(\Delta) = \mathrm{SGW}_{\Delta} + \lambda \|\Delta X_{anc} - Y_{anc}\|^2$.
+The \gls{sgw} formulation of \textcite{vayer2019optimal} projects the high-dimensional spaces onto 1D lines using a set of random unit vectors: points are projected, sorted, and matched by comparing 1D orderings, which substantially reduces the computational cost. Rotation-Invariant SGW (RISGW) extends this by explicitly optimising a rotation matrix $\Delta$ on the Stiefel manifold to find the projection directions that minimise the \gls{sgw} cost. A semi-supervised variant, SS-RISGW, adds an anchor penalty term to steer the rotation: $\mathcal{L}(\Delta) = \mathrm{SGW}_{\Delta} + \lambda \|\Delta X_{anc} - Y_{anc}\|^2$.
 
 \paragraph{Fused Gromov-Wasserstein (FGW).}
-Once the 3D and text features are projected into a shared subspace --- the $k$-dimensional \gls{cca} subspace, in our case --- it becomes possible to compute a direct feature distance $W(X,Y)$ alongside the structural \gls{gw} distance. Fused Gromov-Wasserstein blends the two linearly, controlled by a trade-off parameter $\alpha \in [0,1]$:
+Once the 3D and text features are projected into a shared subspace --- the $k$-dimensional \gls{cca} subspace, in our case --- it becomes possible to compute a direct feature distance $W(X,Y)$ alongside the structural \gls{gw} distance. Fused Gromov-Wasserstein combines the two linearly, controlled by a trade-off parameter $\alpha \in [0,1]$:
 \begin{equation}
     \mathrm{FGW}(X, Y) = (1 - \alpha) \cdot W(X, Y) + \alpha \cdot \mathcal{GW}(X, Y)
 \end{equation}
-so the solver can lean on both direct feature similarity and overall geometric structure at once.
+allowing the solver to exploit both direct feature similarity and overall geometric structure simultaneously.
 
 \paragraph{Low-Rank Gromov-Wasserstein (LR-GW).}
-To handle dense, large-scale datasets without resorting to 1D slicing, \gls{lrgw} factorises the transport plan $T$ into a low-rank approximation of rank $r$: $T \approx Q \, \mathrm{diag}(1/g) \, R^T$. This shrinks both the computational and memory footprint of the quadratic Sinkhorn iterations from Section~\ref{subsec:sinkhorn}, making the whole thing viable at the scale this thesis operates at.
+To handle dense, large-scale datasets without resorting to 1D slicing, \gls{lrgw} factorises the transport plan $T$ into a low-rank approximation of rank $r$: $T \approx Q \, \mathrm{diag}(1/g) \, R^T$. This reduces both the computational and memory footprint of the quadratic Sinkhorn iterations from Section~\ref{subsec:sinkhorn}, rendering the method viable at the scale required by this thesis.
 
-\section{Related Work on 3D-Text and Point Cloud-Language Alignment}
+\section{Related Work on 3D-Text and Point \\ Cloud-Language Alignment}
 \label{sec:related_3dtext}
 
-\textcite{hadgi2025escaping} is the direct methodological source for the supervised baseline replicated here, but it's just one entry in a much larger and fast-growing body of work trying to connect 3D geometry with natural language. Placing this thesis within that landscape helps clarify what's already settled and what's genuinely still open --- namely, whether alignment is achievable without paired supervision at all, which is the central empirical question driving everything in this thesis.
+\textcite{hadgi2025escaping} constitutes the direct methodological source for the supervised baseline replicated here, but it represents only one contribution within a much larger and rapidly growing body of work concerned with connecting 3D geometry to natural language. Situating this thesis within that landscape clarifies what is already established and what remains genuinely open --- namely, whether alignment is achievable without paired supervision, which is the central empirical question addressed throughout this thesis.
 
 \paragraph{Contrastive 3D-Language Pre-training.}
-One family of approaches, ULIP \cite{xue2023ulip} being the clearest example, trains 3D encoders \emph{jointly} with frozen or lightly fine-tuned CLIP image and text towers, using a triplet contrastive objective spanning point clouds, rendered images, and captions. This is a meaningfully different setup from the post-hoc, frozen-encoder approach studied here: ULIP-style methods explicitly push the 3D backbone toward embeddings that are contrastively co-located with the pre-trained CLIP space \emph{during training} --- effectively engineering the structural isometry that this thesis finds does \emph{not} show up for free between encoders trained independently of one another.
+One family of approaches, exemplified by ULIP \cite{xue2023ulip}, trains 3D encoders \emph{jointly} with frozen or lightly fine-tuned CLIP image and text towers, using a triplet contrastive objective spanning point clouds, rendered images, and captions. This constitutes a meaningfully different setup from the post-hoc, frozen-encoder approach studied here: ULIP-style methods explicitly push the 3D backbone toward embeddings that are contrastively co-located with the pre-trained CLIP space \emph{during training} --- effectively engineering the structural isometry that this thesis finds does \emph{not} arise spontaneously between encoders trained independently of one another.
 
 \paragraph{Zero-Shot Point Cloud Understanding via 2D Projection.}
-A second family, represented by PointCLIP \cite{zhang2022pointclip} and its successor PointCLIP V2 \cite{zhu2023pointclip}, avoids native 3D-text alignment altogether: point clouds get projected into 2D depth-map views, which the frozen, pre-trained CLIP image encoder then classifies directly. It works well on shape classification benchmarks, but at its core this is really a 2D vision-language problem wearing a 3D costume --- it never tests, and can't answer, whether native 3D geometric encoders like PointNet or SparseConv (the ones studied here) share any intrinsic structural similarity with text embeddings.
+A second family, represented by PointCLIP \cite{zhang2022pointclip} and its successor PointCLIP V2 \cite{zhu2023pointclip}, avoids native 3D-text alignment altogether: point clouds are projected into 2D depth-map views, which the frozen, pre-trained CLIP image encoder then classifies directly. This approach performs well on shape classification benchmarks, but is fundamentally a 2D vision-language problem applied to 3D input; it does not test, and cannot answer, whether native 3D geometric encoders such as PointNet or SparseConv (the encoders studied here) share any intrinsic structural similarity with text embeddings.
 
 \paragraph{Large-Scale Open-World 3D Representation Learning.}
-More recently, OpenShape \cite{liu2023openshape} took the ULIP idea and scaled it to millions of 3D-text-image triplets pulled from Objaverse and several other 3D datasets, training a unified embedding space through multi-modal contrastive learning at scale. It's a strong demonstration that large-scale \emph{joint} training can produce genuinely effective 3D-language embeddings --- but by construction it doesn't, and can't, address the question this thesis is asking: whether \emph{independently, uni-modally trained} 3D and text encoders already share enough intrinsic geometric structure to be aligned \emph{post hoc}, with no joint optimisation of the 3D backbone at all.
+More recently, OpenShape \cite{liu2023openshape} extended the ULIP approach to millions of 3D-text-image triplets drawn from Objaverse and several other 3D datasets, training a unified embedding space through multi-modal contrastive learning at scale. This demonstrates that large-scale \emph{joint} training can produce effective 3D-language embeddings, but by construction it does not, and cannot, address the question posed by this thesis: whether \emph{independently, uni-modally trained} 3D and text encoders already share sufficient intrinsic geometric structure to be aligned \emph{post hoc}, without joint optimisation of the 3D backbone.
 
 \paragraph{Positioning of this Thesis.}
-A pattern runs through all of this: every prior method that achieves strong 3D-text alignment does so by training some part of the pipeline jointly --- whether through contrastive triplet losses (ULIP, OpenShape) or by riding on an already-aligned 2D vision-language space (PointCLIP). None of them directly tests whether uni-modal 3D and text encoders, trained in total isolation from each other, are \emph{already} isometric. That's precisely the theoretical question motivating the supervised-versus-unsupervised comparison at the heart of this thesis, and it's the question our thirteen-test ablation study in Chapter~\ref{ch:gw_alignment} ends up answering in the negative.
+A consistent pattern emerges across this body of work: every prior method that achieves strong 3D-text alignment does so by training some part of the pipeline jointly --- whether through contrastive triplet losses (ULIP, OpenShape) or by relying on an already-aligned 2D vision-language space (PointCLIP). None of these directly tests whether uni-modal 3D and text encoders, trained in complete isolation from one another, are \emph{already} isometric. This is precisely the question motivating the supervised-versus-unsupervised comparison at the centre of this thesis, and it is the question the thirteen-test ablation study in Chapter~\ref{ch:gw_alignment} ultimately answers in the negative.
 
 \section{Gap Addressed by this Thesis}
 \label{sec:gap_addressed}
 
-Recent progress in cross-modal learning shows that, using the zero-shot Canonical Correlation Analysis and affine projection pipeline proposed by \textcite{hadgi2025escaping}, uni-modal 3D and text latent spaces \emph{can} be aligned a posteriori, provided anchors are explicitly supervised. On the strength of this linear mapping's success, some have claimed that language models and 3D geometric encoders naturally converge toward shared topological structures, even without any joint multimodal training.
+Recent progress in cross-modal learning demonstrates that, using the zero-shot Canonical Correlation Analysis and affine projection pipeline proposed by \textcite{hadgi2025escaping}, uni-modal 3D and text latent spaces \emph{can} be aligned a posteriori, provided explicitly supervised anchors are available. On the strength of this linear mapping's success, one might be tempted to conclude that language models and 3D geometric encoders naturally converge toward shared topological structures, even in the absence of joint multimodal training.
 
-But if that were really true --- if the latent spaces were geometrically aligned to begin with --- structural isometric evaluators like Gromov-Wasserstein Optimal Transport ought to recover the correspondence with no anchor labels at all. Nobody has thoroughly examined whether the success of \gls{cca} and affine mapping actually reflects a shared geometry between the two modalities, or whether it's simply an artefact of the explicit supervision doing the heavy lifting.
+However, if this were the case --- if the latent spaces were geometrically aligned from the outset --- structural isometry evaluators such as Gromov-Wasserstein Optimal Transport should be capable of recovering the correspondence without any anchor labels. Few studies have systematically examined whether the success of \gls{cca} and affine mapping actually reflects a shared geometry between the two modalities, or whether it is simply an artefact of the explicit supervision.
 
-This thesis runs that experiment directly, comparing supervised linear mapping against unsupervised Optimal Transport on a large-scale 3D-text dataset, in pursuit of one fundamental question: are uni-modal 3D and text latent representations intrinsically, structurally isometric? We assess the various Gromov-Wasserstein approaches against the supervised linear method head-to-head, and we show --- both theoretically and empirically, across the chapters that follow --- that uni-modal 3D and text latent representations fundamentally lack structural isometry, which is exactly why relational Optimal Transport methods fail here.
+This thesis addresses that question directly, comparing supervised linear mapping against unsupervised Optimal Transport on a large-scale 3D-text dataset, in pursuit of one fundamental question: are uni-modal 3D and text latent representations intrinsically, structurally isometric? We evaluate the various Gromov-Wasserstein approaches against the supervised linear method directly, and demonstrate --- through the empirical evidence and grounded theoretical interpretation presented across the chapters that follow --- that uni-modal 3D and text latent representations fundamentally lack structural isometry, which is precisely why relational Optimal Transport methods fail in this setting.

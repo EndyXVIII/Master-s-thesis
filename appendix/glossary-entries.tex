@@ -86,7 +86,9 @@
 \newacronym[description={\glslink{rqg}{Research Question}}]
     {rq}{RQ}{Research Question}
 
-
+\newacronym[description={\glslink{qapg}{Quadratic Assignment Problem}}]
+    {qap}{QAP}{Quadratic Assignment Problem}
+    
 % ============================================================================
 % Glossary entries
 % ============================================================================
@@ -286,4 +288,11 @@
     text=Research Question,
     sort=research question,
     description={abbreviation used in this thesis to identify the three research questions (RQ1, RQ2, RQ3) formulated in Chapter 1 and addressed respectively by the supervised baseline, the unsupervised Optimal Transport methods, and the theoretical analysis of structural non-isometry}
+}
+
+\newglossaryentry{qapg} {
+    name=\glslink{qap}{QAP},
+    text=Quadratic Assignment Problem,
+    sort=quadratic assignment problem,
+    description={a classical combinatorial optimisation problem that seeks the permutation minimising a quadratic cost function over pairwise relations between two sets. In this thesis it is used as an external verification method (Section~\ref{subsec:blind_match_verification}), via the factorized Hahn-Grant solver of Schnaus et al., to confirm the Gromov-Wasserstein failure is not solver-specific}
 }
