@@ -51,6 +51,7 @@ Table~\ref{tab:runtime_summary} details representative wall-clock runtimes for t
 \begin{table}[htpb]
 \centering
 \small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 \textbf{Configuration} & \textbf{Theoretical Complexity} & \textbf{Rank} & \textbf{Wall-clock time} \\
@@ -59,7 +60,8 @@ LR-GW, post-CCA ($k$=50)      & $\mathcal{O}(n^2)$ per Sinkhorn iter. & $r$=20 &
 LR-GW, pre-CCA (raw features) & $\mathcal{O}(n^2)$ per Sinkhorn iter. & $r$=20 & $\approx$293s per $\epsilon$ value \\
 GW diagnostic (6 pairs, 3 seeds) & $\mathcal{O}(n^2)$ per pair & --- & 8m01s total \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \caption{Representative wall-clock runtimes for the epsilon sweep of Test 13
 (Section~\ref{subsec:advanced_verifications}) and the diagnostic GW analysis
 of Section~\ref{sec:why_gw_fails}, measured on CPU nodes of the
@@ -209,8 +211,11 @@ Having validated the codebase, the investigation shifted to the optimisation dyn
 Entropic regularisation ($\epsilon$) governs the smoothness of the transport plan. Eight values were swept ($\epsilon \in \{0.001, 0.005, 0.01, 0.05,\allowbreak 0.1, 0.5, 1.0, 5.0\}$) at rank 20 employing a cosine cost. The solver returned an identical final \gls{gw} cost of $0.0392$ across all eight configurations. The algorithm consistently converges to the exact same stationary point regardless of regularisation strength, indicating that no superior local minimum exists within the landscape for a divergent $\epsilon$ to discover.
 
 \paragraph{Test 4: Cost Function Formulation.}
-High-dimensional neural representations do not always conform intuitively to standard Euclidean norms. The default squared-Euclidean distance was replaced with an angular distance metric $d(x, x') = \arccos\!\left(\tfrac{x \cdot x'}{\|x\|\,\|x'\|}\right)$, conforming to the methodology proposed by \textcite{li2026scale}. This angular metric increased Top-5 accuracy from $0.4\%$ to $1.9\%$. While a measurable improvement, it remains approximately $18\times$ below the supervised \gls{cca}+Affine baseline \cite{hadgi2025escaping}, indicating that the distance function formulation is not the primary limiting factor.
-
+High-dimensional neural representations do not always conform intuitively to standard Euclidean norms. The default squared-Euclidean distance was replaced with an angular distance metric:
+\begin{equation}
+    d(x, x') = \arccos\left(\frac{x \cdot x'}{\|x\|\,\|x'\|}\right)
+\end{equation}
+conforming to the methodology proposed by \textcite{li2026scale}. This angular metric increased Top-5 accuracy from $0.4\%$ to $1.9\%$. While a measurable improvement, it remains approximately $18\times$ below the supervised \gls{cca}+Affine baseline \cite{hadgi2025escaping}, indicating that the distance function formulation is not the primary limiting factor.
 \paragraph{Test 5: Raw Features and Scale-Matching.}
 To determine if normalisation artifacts were responsible, \gls{lrgw} was executed directly on raw, pre-\gls{cca} normalised features. The median-ratio scale correction introduced by \textcite{li2026scale}, $s = \text{med}(D_Y)/\text{med}(D_X)$, was applied to adjust for disparities in modal density. The resulting performance --- $0.5\%$ Top-5 accuracy, irrespective of correction --- demonstrates that simple scale discrepancies are not the primary issue.
 
