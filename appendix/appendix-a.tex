@@ -1,14 +1,14 @@
 \chapter{Appendix A}
 \label{app:appendix_a}
 
-This appendix compiles supplementary technical material to support reproducibility and methodological transparency for the experiments detailed in Chapters~\ref{ch:baseline}, \ref{ch:nonlinear}, and \ref{ch:gw_alignment}. Section~\ref{sec:app_environment} documents the complete software and hardware environment utilized. Section~\ref{sec:app_script_mapping} maps the thirteen-test ablation study of Chapter~\ref{ch:gw_alignment} to the specific scripts and execution modes that produced each result. Section~\ref{sec:app_pseudocode} presents formal pseudocode for the core Optimal Transport algorithms previously described only in prose. Section~\ref{sec:app_hyperparam_spaces} consolidates the comprehensive hyperparameter search spaces explored during the Chapter~\ref{ch:gw_alignment} ablation study. Section~\ref{sec:app_notation} provides a reference table of the mathematical notation employed throughout this thesis. Finally, Section~\ref{sec:app_data_availability} concludes with a summary of data and code availability.
+This appendix compiles supplementary technical material to support reproducibility and methodological transparency for the experiments detailed in Chapters~\ref{ch:baseline}, \ref{ch:nonlinear}, and \ref{ch:gw_alignment}. Section~\ref{sec:app_environment} documents the complete software and hardware environment utilised. Section~\ref{sec:app_script_mapping} maps the thirteen-test ablation study of Chapter~\ref{ch:gw_alignment} to the specific scripts and execution modes that produced each result. Section~\ref{sec:app_pseudocode} presents formal pseudocode for the core Optimal Transport algorithms previously described only in prose. Section~\ref{sec:app_hyperparam_spaces} consolidates the comprehensive hyperparameter search spaces explored during the Chapter~\ref{ch:gw_alignment} ablation study. Section~\ref{sec:app_notation} provides a reference table of the mathematical notation employed throughout this thesis. Finally, Section~\ref{sec:app_data_availability} concludes with a summary of data and code availability.
 
 \section{Software and Hardware Environment}
 \label{sec:app_environment}
 
-All experiments in this thesis were executed on the University of Padova's \gls{hpc} cluster, \texttt{labsrv7}, utilizing Slurm for job scheduling and resource allocation. Table~\ref{tab:app_hw} details the compute hardware utilized across the various stages of the pipeline, while Table~\ref{tab:app_sw} specifies the software environment and package versions underlying all reported results.
+All experiments in this thesis were executed on the University of Padova's \gls{hpc} cluster, \texttt{labsrv7}, utilising Slurm for job scheduling and resource allocation. Table~\ref{tab:app_hw} details the compute hardware utilised across the various stages of the pipeline, while Table~\ref{tab:app_sw} specifies the software environment and package versions underlying all reported results.
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \begin{tabularx}{\textwidth}{lX}
@@ -30,7 +30,7 @@ confirmed directly from job logs (\texttt{Devices: [CpuDevice(id=0)]}).}
 \label{tab:app_hw}
 \end{table}
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \begin{tabularx}{\textwidth}{lX}
@@ -58,9 +58,9 @@ Feature files are stored on the cluster filesystem within the \texttt{features\_
 \section{Script-to-Experiment Mapping}
 \label{sec:app_script_mapping}
 
-The thirteen-test ablation study detailed in Section~\ref{sec:ablation_study} and the core GW variant implementations of Section~\ref{sec:gw_methods} were executed using a consolidated set of dedicated Python scripts. Each script supports multiple execution modes selectable via command-line arguments. Table~\ref{tab:app_script_mapping} provides the complete mapping between every quantitative result reported in Chapter~\ref{ch:gw_alignment} and the specific script and mode utilized to generate it, ensuring exact reproducibility.
+The thirteen-test ablation study detailed in Section~\ref{sec:ablation_study} and the core GW variant implementations of Section~\ref{sec:gw_methods} were executed using a consolidated set of dedicated Python scripts. Each script supports multiple execution modes selectable via command-line arguments. Table~\ref{tab:app_script_mapping} provides the complete mapping between every quantitative result reported in Chapter~\ref{ch:gw_alignment} and the specific script and mode utilised to generate it, ensuring exact reproducibility.
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \resizebox{\textwidth}{!}{%
@@ -95,9 +95,9 @@ Each script outputs its numerical results to a corresponding \texttt{results\_*.
 \section{Algorithm Pseudocode}
 \label{sec:app_pseudocode}
 
-This section presents formal pseudocode for the two core algorithms underlying the unsupervised alignment methods discussed in Chapter~\ref{ch:gw_alignment}: the Sliced Gromov-Wasserstein approximation from Section~\ref{subsec:sliced_gw}, and the Sinkhorn matrix-scaling procedure from Section~\ref{subsec:sinkhorn}, which forms the foundation of the LRSinkhorn sub-solver utilized by the Low-Rank Gromov-Wasserstein method (Section~\ref{subsec:low_rank_gw}).
+This section presents formal pseudocode for the two core algorithms underlying the unsupervised alignment methods discussed in Chapter~\ref{ch:gw_alignment}: the Sliced Gromov-Wasserstein approximation from Section~\ref{subsec:sliced_gw}, and the Sinkhorn matrix-scaling procedure from Section~\ref{subsec:sinkhorn}, which forms the foundation of the LRSinkhorn sub-solver utilised by the Low-Rank Gromov-Wasserstein method (Section~\ref{subsec:low_rank_gw}).
 
-\begin{algorithm}[htpb]
+\begin{algorithm}[H]
 \caption{Sliced Gromov-Wasserstein (SGW) Score Accumulation}
 \label{alg:sgw}
 \begin{algorithmic}[1]
@@ -105,20 +105,20 @@ This section presents formal pseudocode for the two core algorithms underlying t
 \Ensure Score matrix $S \in \mathbb{R}^{n \times n}$
 \State $S \gets \mathbf{0}_{n \times n}$
 \For{$p = 1$ \textbf{to} $P$}
-    \State Sample random unit vector $\theta \sim \mathrm{Unif}(S^{k-1})$
-    \State $x_\theta \gets X \theta$ \Comment{project onto $\theta$}
-    \State $y_\theta \gets Y \theta$
-    \State $\pi_X \gets \mathrm{argsort}(x_\theta)$ \Comment{1D ordering}
-    \State $\pi_Y \gets \mathrm{argsort}(y_\theta)$
-    \State $c_X \gets$ pairwise squared distances of $\mathrm{sort}(x_\theta)$
-    \State $c_Y \gets$ pairwise squared distances of $\mathrm{sort}(y_\theta)$
-    \State $\mathrm{cost}_{\mathrm{id}} \gets \| c_X - c_Y \|^2$
-    \State $\mathrm{cost}_{\mathrm{anti}} \gets \| c_X - \mathrm{reverse}(c_Y) \|^2$
-    \If{$\mathrm{cost}_{\mathrm{id}} \leq \mathrm{cost}_{\mathrm{anti}}$}
-        \State $S[\pi_X, \pi_Y] \gets S[\pi_X, \pi_Y] + 1$
-    \Else
-        \State $S[\pi_X, \mathrm{reverse}(\pi_Y)] \gets S[\pi_X, \mathrm{reverse}(\pi_Y)] + 1$
-    \EndIf
+\State Sample random unit vector $\theta \sim \mathrm{Unif}(S^{k-1})$
+\State $x_\theta \gets X \theta$ \Comment{project onto $\theta$}
+\State $y_\theta \gets Y \theta$
+\State $\pi_X \gets \mathrm{argsort}(x_\theta)$ \Comment{1D ordering}
+\State $\pi_Y \gets \mathrm{argsort}(y_\theta)$
+\State $c_X \gets$ pairwise squared distances of $\mathrm{sort}(x_\theta)$
+\State $c_Y \gets$ pairwise squared distances of $\mathrm{sort}(y_\theta)$
+\State $\mathrm{cost}_{\mathrm{id}} \gets \| c_X - c_Y \|^2$
+\State $\mathrm{cost}_{\mathrm{anti}} \gets \| c_X - \mathrm{reverse}(c_Y) \|^2$
+\If{$\mathrm{cost}_{\mathrm{id}} \leq \mathrm{cost}_{\mathrm{anti}}$}
+\State $S[\pi_X, \pi_Y] \gets S[\pi_X, \pi_Y] + 1$
+\Else
+\State $S[\pi_X, \mathrm{reverse}(\pi_Y)] \gets S[\pi_X, \mathrm{reverse}(\pi_Y)] + 1$
+\EndIf
 \EndFor
 \State \Return $S$
 \end{algorithmic}
@@ -126,7 +126,7 @@ This section presents formal pseudocode for the two core algorithms underlying t
 
 Algorithm~\ref{alg:sgw} accumulates votes over $P$ random 1D projections based on the optimal 1D ordering implied by each projection --- selecting either the identity alignment of the two sorted sequences or their reversal, depending on which yields a lower structural cost. The resulting score matrix $S$ functions directly as a similarity matrix for Top-$K$ retrieval and Hungarian matching evaluation, consistent with the methodology in Section~\ref{subsec:matching_acc}. This approach closely follows Algorithm 1 proposed by \textcite{vayer2019optimal}, as referenced in Section~\ref{subsec:sliced_gw}.
 
-\begin{algorithm}[htpb]
+\begin{algorithm}[H]
 \caption{Sinkhorn Matrix Scaling (entropic OT sub-solver)}
 \label{alg:sinkhorn}
 \begin{algorithmic}[1]
@@ -135,11 +135,11 @@ Algorithm~\ref{alg:sgw} accumulates votes over $P$ random 1D projections based o
 \State $K \gets \exp(-C / \epsilon)$ \Comment{Gibbs kernel}
 \State $u \gets \mathbf{1}_n$, $v \gets \mathbf{1}_n$
 \For{$i = 1$ \textbf{to} $I$}
-    \State $u \gets \mathbf{a} \oslash (K v)$ \Comment{element-wise division}
-    \State $v \gets \mathbf{b} \oslash (K^\top u)$
-    \If{$\| u \odot (Kv) - \mathbf{a} \|_1 < \text{tol}$}
-        \State \textbf{break} \Comment{marginal constraints satisfied}
-    \EndIf
+\State $u \gets \mathbf{a} \oslash (K v)$ \Comment{element-wise division}
+\State $v \gets \mathbf{b} \oslash (K^\top u)$
+\If{$\| u \odot (Kv) - \mathbf{a} \|_1 < \text{tol}$}
+\State \textbf{break} \Comment{marginal constraints satisfied}
+\EndIf
 \EndFor
 \State $T \gets \mathrm{diag}(u) \, K \, \mathrm{diag}(v)$
 \State \Return $T$
@@ -151,9 +151,9 @@ Algorithm~\ref{alg:sinkhorn} is the linear sub-solver called at every outer iter
 \section{Full Hyperparameter Search Spaces}
 \label{sec:app_hyperparam_spaces}
 
-While Chapter~\ref{ch:gw_alignment} reports the optimal configuration for each hyperparameter sweep within the thirteen-test ablation study, the comprehensive search spaces are distributed throughout the text. This section consolidates every hyperparameter range evaluated in Chapter~\ref{ch:gw_alignment} into three organized reference tables, categorized by their function: Table~\ref{tab:app_search_core} covers the core optimisation hyperparameters that apply broadly across LR-GW regardless of variant --- rank, regularisation, subspace dimension, and query size, swept in Tests 3, 6, 7, and 8. Table~\ref{tab:app_search_methods} reports the hyperparameters specific to the sliced and semi-supervised GW variants (FGW, SS-RISGW, SGW, RISGW), including the large-scale grid search underlying the SGW family. Table~\ref{tab:app_search_preprocessing} covers the two preprocessing choices tested in Tests 4 and 12. Unless stated otherwise, ``best value'' always refers to the configuration achieving the highest Top-5 retrieval accuracy on PointNet$\times$CLIP.
+While Chapter~\ref{ch:gw_alignment} reports the optimal configuration for each hyperparameter sweep within the thirteen-test ablation study, the comprehensive search spaces are distributed throughout the text. This section consolidates every hyperparameter range evaluated in Chapter~\ref{ch:gw_alignment} into three organised reference tables, categorised by their function: Table~\ref{tab:app_search_core} covers the core optimisation hyperparameters that apply broadly across LR-GW regardless of variant --- rank, regularisation, subspace dimension, and query size, swept in Tests 3, 6, 7, and 8. Table~\ref{tab:app_search_methods} reports the hyperparameters specific to the sliced and semi-supervised GW variants (FGW, SS-RISGW, SGW, RISGW), including the large-scale grid search underlying the SGW family. Table~\ref{tab:app_search_preprocessing} covers the two preprocessing choices tested in Tests 4 and 12. Unless stated otherwise, ``best value'' always refers to the configuration achieving the highest Top-5 retrieval accuracy on PointNet$\times$CLIP.
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \begin{tabularx}{\textwidth}{p{3.0cm}Xp{4.2cm}l}
@@ -173,7 +173,7 @@ specific GW variant used.}
 \label{tab:app_search_core}
 \end{table}
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \resizebox{\textwidth}{!}{%
@@ -200,7 +200,7 @@ including the large-scale 288-configuration grid search.}
 \label{tab:app_search_methods}
 \end{table}
 
-\begin{table}[htpb]
+\begin{table}[H]
 \centering
 \small
 \begin{tabularx}{\textwidth}{Xp{4.0cm}Xl}
@@ -220,7 +220,7 @@ the median-ratio scale-matching normalisation introduced by
 \section{Notation and Symbols}
 \label{sec:app_notation}
 
-Table~\ref{tab:app_notation} summarizes the principal mathematical notation employed throughout this thesis to facilitate cross-chapter reference.
+Table~\ref{tab:app_notation} summarises the principal mathematical notation employed throughout this thesis to facilitate cross-chapter reference.
 
 \begingroup
 \small
@@ -285,4 +285,4 @@ $\mathrm{CKA}(K,L)$        & Centered Kernel Alignment score & \S\ref{subsec:cka
 \section{Data and Code Availability}
 \label{sec:app_data_availability}
 
-All scripts underlying the feature extraction pipeline, alignment method implementations, and diagnostic ablation study are stored on the \texttt{labsrv7} cluster filesystem, organised within a centralised project directory rather than an external code repository. Raw extracted features for all six encoder combinations (Table~\ref{tab:app_sw}) are retained there within the \texttt{features\_100k/} directory. These features are not redistributed as part of this thesis due to their substantial storage requirements ($100{,}000$ objects across up to $1280$ dimensions per encoder). The Objaverse dataset \cite{deitke2023objaverse} and its corresponding Cap3D captions \cite{luo2023scalable} are publicly accessible from their original sources. Similarly, all pre-trained encoder weights utilized in this research (PointNet, OpenCLIP ViT-bigG-14, BERT, RoBERTa) have been released by their respective authors. The sole exception is SparseConv, for which pre-trained weights were unavailable at the time of writing (Section~\ref{subsec:3d_encoders}). The numerical results underlying the tables in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment} are preserved in the corresponding \texttt{results\_*.json} output files, as referenced in Table~\ref{tab:app_script_mapping}.
+All scripts underlying the feature extraction pipeline, alignment method implementations, and diagnostic ablation study are stored on the \texttt{labsrv7} cluster filesystem, organised within a centralised project directory rather than an external code repository. Raw extracted features for all six encoder combinations (Table~\ref{tab:app_sw}) are retained there within the \texttt{features\_100k/} directory. These features are not redistributed as part of this thesis due to their substantial storage requirements ($100{,}000$ objects across up to $1280$ dimensions per encoder). The Objaverse dataset \cite{deitke2023objaverse} and its corresponding Cap3D captions \cite{luo2023scalable} are publicly accessible from their original sources. Similarly, all pre-trained encoder weights utilised in this research (PointNet, OpenCLIP ViT-bigG-14, BERT, RoBERTa) have been released by their respective authors. The sole exception is SparseConv, for which pre-trained weights were unavailable at the time of writing (Section~\ref{subsec:3d_encoders}). The numerical results underlying the tables in Chapters~\ref{ch:baseline}--\ref{ch:gw_alignment} are preserved in the corresponding \texttt{results\_*.json} output files, as referenced in Table~\ref{tab:app_script_mapping}.
