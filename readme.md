@@ -1,201 +1,135 @@
-# Thesis template
-A simple Thesis template for the Bachelor Degree in Computer Science @Unipadova
+# Aligning 3D and Text Latent Spaces
 
-# Installation
-To use this template you will need a full LaTeX configuration installed.
-If you don't have an already installed distribution you can read the following instructions and you'll be ready to go!
+**An Empirical Study of Alignment Methods**
 
-<details>
-<summary>Read more</summary>
+Master's Thesis — MSc in Computer Science, University of Padova
+Author: **Endi Hysa** · Supervisor: **Dr. Marco Fiorucci**
+Department of Mathematics, University of Padova
 
-## TeX Live installation
-You can use whatever you want to compile your thesis, but one of the most straightforward ways is using TeX Live.
-It should be available on every platform you use and comes with a lot of packages and tools.
-
-There are downloads for [Windows](https://mirror.ctan.org/systems/texlive/tlnet/install-tl-windows.exe) and [macOS](https://mirror.ctan.org/systems/mac/mactex/MacTeX.pkg), or instead you can install it using your favorite package manager:
-```bash
-sudo apt install texlive-full
-```
-```bash
-sudo pacman -S texlive-most
-```
-```bash
-sudo dnf install texlive-scheme-full
-```
-```bash
-brew install basictex
-```
-```powershell
-choco install texlive
-```
-
-## Configuration for TeX Live
-This template is pretty big and complex, therefore it requires a lot of specific packages that may not be shipped with your installation of TeX Live by default.
-
-Here's the complete list of packages that you'll need, in order to be able to successfully compile your thesis:
-- pdfx
-- xcolor
-- xmpincl
-- caption
-- changepage
-- csquotes
-- emptypage
-- epigraph
-- nextpage
-- eurosym
-- layaureo
-- listings
-- microtype
-- mparhack
-- relsize
-- quoting
-- booktabs
-- glossaries
-- glossaries-italian
-- glossaries-english
-- biber
-- biblatex
-- babel
-- babel-italian
-- cm-super
-- greek-fontenc
-- latexmk
-- fancyhdr
-
-You can install them manually using the TeX Live Manager (good luck!), or using the CLI utility counterpart `tlmgr`
-
-Just copy and paste the following command in your terminal.
-```bash
-sudo tlmgr update --self
-sudo tlmgr update --all
-sudo tlmgr install pdfx xcolor xmpincl caption changepage csquotes emptypage epigraph nextpage eurosym layaureo listings microtype mparhack relsize quoting booktabs glossaries glossaries-italian glossaries-english biber biblatex babel babel-italian cm-super greek-fontenc latexmk fancyhdr
-```
-
-As you can see `tlmgr` asks for admin rights, so you'll need to use `sudo` on Linux/macOS, while on Windows you have to [open a command prompt instance as admin](https://www.makeuseof.com/windows-run-command-prompt-admin/) and omit the `sudo` at the beginning of the lines.
-
-</details>
-
-## SVG support
-
-SVG images are supported (and encouraged) with the following dependencies:
-
-- `cairosvg`
-- (only for draw.io diagrams) a POSIX environment due to `sed` usage, if you feel brave you can port the logic to Perl :)
+[![Thesis PDF](https://img.shields.io/badge/thesis-PDF-9B0013.svg)](./thesis.pdf)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 ---
 
-# Compilation
-You tried to compile this template and the glossary isn't showing up or the bibliography is empty? Don't panic, that's pretty normal.
-It happens because glossary and bibliography need a special treatment during the compilation process.
+## Overview
 
-Down here you find all the details to successfully compile the PDF
+This thesis investigates whether 3D geometric representations and natural language representations — learned by **independently trained**, uni-modal encoders — share enough intrinsic structure to be aligned *after the fact*, purely through mathematical post-processing, with no joint retraining of either encoder.
 
-<details>
-<summary>Read more</summary>
+Two families of alignment methods are evaluated end-to-end on a shared dataset and protocol:
 
-## Latexmk
-In order to get the complete PDF of your thesis, with all the rings and bells of glossaries and bibliographies you need to compile using latexmk with the following command:
+- **Supervised methods** (linear and non-linear), which use thousands of known 3D–text correspondences.
+- **Unsupervised Optimal Transport**, specifically **Gromov-Wasserstein (GW)**, which uses no cross-modal correspondence at all — only the internal relational structure of each space independently.
+
+The central finding is that unsupervised relational transport **fails systematically** to recover a meaningful alignment in this setting, and the thesis provides a rigorous, multi-angle explanation for *why*: independently trained 3D and text latent spaces do not satisfy the structural isometry that methods like Gromov-Wasserstein require in order to succeed without supervision.
+
+## Key Results
+
+| Method | Supervision | Top-5 Accuracy (PointNet × CLIP) |
+|---|---|---|
+| CCA + Affine (linear baseline) | Supervised (30k anchors) | **35.7%** |
+| Riemannian Metric Learning | Supervised (30k anchors) | 27.2% |
+| Kernel CCA | Supervised (30k anchors) | 15.8% |
+| Fused Gromov-Wasserstein | Semi-supervised (1k anchors) | 4.4% |
+| Sliced Gromov-Wasserstein | Unsupervised | 3.2% |
+| Low-Rank Gromov-Wasserstein | Unsupervised | 1.2% |
+| Random baseline | — | ≈1.6% |
+
+The best unsupervised method reaches roughly **8× below** the supervised baseline — a gap explained, and independently verified, through:
+
+- A **thirteen-test diagnostic ablation study**, systematically ruling out implementation bugs, hyperparameter misconfiguration, dataset artefacts, and library-specific issues as explanations for the failure.
+- **Structural evidence** (Centered Kernel Alignment scores, a diagnostic Gromov-Wasserstein cost, and transport-plan concentration analysis) confirming the absence of genuine structural isometry between independently trained 3D and text encoders.
+- An **external, independent verification** using an exact Quadratic Assignment Problem solver (Schnaus et al., CVPR 2025, *"It's a (Blind) Match!"*) on category-aggregated data, confirming the same qualitative failure with a completely different optimisation method.
+
+Full details, all thirteen ablation tests, and the complete set of results across all six 3D–text encoder combinations are reported in the thesis document.
+
+## Repository Structure
+
+```
+.
+├── thesis.pdf                  # Full thesis document
+├── src/
+│   ├── features/                # Feature extraction pipeline (PointNet, SparseConv, CLIP, RoBERTa, BERT)
+│   ├── baseline/                 # CCA + Affine supervised baseline
+│   ├── nonlinear/                # Kernel CCA and Riemannian Metric Learning
+│   ├── gromov_wasserstein/       # SGW, RISGW, SS-RISGW, FGW, LR-GW implementations
+│   ├── ablation/                 # Thirteen diagnostic ablation tests
+│   ├── diagnostics/               # CKA and GW-cost-as-compatibility-metric analysis
+│   └── blind_match/              # External QAP-based verification
+├── results/
+│   └── *.json                    # Raw numerical results underlying every table and figure in the thesis
+├── figures/
+│   └── *.pdf                     # Figures reproduced in the thesis
+├── environment/
+│   ├── ott_env.yml               # Conda environment for JAX / OTT-JAX / POT experiments
+│   └── itsamatch_env.yml         # Conda environment for the external blind-matching verification
+└── README.md
+```
+
+*(Adjust folder names above to match the actual layout of this repository before publishing.)*
+
+## Dataset
+
+Experiments use **46,675** paired 3D–text objects, built from [Objaverse](https://objaverse.allenai.org/) with captions from the [Cap3D](https://github.com/crockwell/Cap3D) framework. Of these, 30,000 pairs serve as anchors for supervised training, and 500 are held out exclusively for evaluation. Raw extracted features are not redistributed in this repository due to their size; instructions for regenerating them from the public Objaverse and Cap3D sources are provided in `src/features/`.
+
+## Encoders
+
+| Modality | Encoder | Output Dimension | Notes |
+|---|---|---|---|
+| 3D | PointNet | 1024 | Pre-trained |
+| 3D | SparseConv | 512 | Random, untrained weights (deliberate lower-bound control) |
+| Text | OpenCLIP (ViT-bigG-14) | 1280 | Text tower only |
+| Text | RoBERTa-base | 768 | — |
+| Text | BERT-base-uncased | 768 | — |
+
+## Reproducing the Experiments
+
 ```bash
-latexmk thesis.tex
+# Clone the repository
+git clone https://github.com/<username>/<repo-name>.git
+cd <repo-name>
+
+# Set up the environment (JAX / OTT-JAX / POT experiments)
+conda env create -f environment/ott_env.yml
+conda activate ott_env
+
+# Run feature extraction (requires Objaverse + Cap3D access)
+python src/features/extract_all.py
+
+# Reproduce the supervised baseline
+python src/baseline/run_cca_affine.py
+
+# Reproduce the Gromov-Wasserstein experiments
+python src/gromov_wasserstein/run_all_variants.py
+
+# Run the full thirteen-test ablation study
+python src/ablation/run_all_tests.py
 ```
 
-Latexmk is a powerful tool and allows you to do some other interesting stuff too, see `latexmk -help`.
-Most notably, if something feels wrong in the produced PDF you may want to force a full recompilation, using the `-g` (or the more aggressive `-gg`) option.
+*(Update commands above to match the actual entry-point scripts in this repository.)*
 
-## Yeah ok, cool, but I don't want to always compile from the terminal
-You can tell your LaTeX editor to compile using latexmk by default.
+## Citation
 
-### VS Code + TeX Workshop extension
-This template comes with a [`settings.json`](.vscode/settings.json) file, that sets latexmk as the default command to compile the PDF.
-Everything should work fine out of the box.
+If you use this work, please cite:
 
-### TeXStudio
-Read the first 3 points of [this guide](https://latex.ti.bfh.ch/doc_gettingStarted/configuration/texstudio.html).
-
-</details>
-
----
-
-# Template structure
-So, you finally managed to get your setup working and you're ready to begin to write actual stuff, but you just realized there are so many files in here and you don't even know where to start from...
-
-First of all, these are the only files you should care about:
-```
-Thesis
-├── appendix/
-│   ├── appendice-a.tex
-│   ├── bibliography.bib
-│   ├── bibliography.tex
-│   └── glossary-entries.tex
-├── chapters/
-│   ├── concept.tex
-│   └── ...
-├── config/
-│   ├── packages.tex
-│   ├── thesis-config.tex
-│   └── variables.tex
-├── images/
-│   ├── unipd-logo.png
-│   └── ...
-├── preface/
-│   ├── acknowledgements.tex
-│   ├── copyright.tex
-│   ├── dedication.tex
-│   ├── summary.tex
-│   ├── table-of-contents.tex
-│   └── title-page.tex
-├── structure.tex
-├── printable-thesis.tex
-└── thesis.tex
+```bibtex
+@mastersthesis{hysa2026aligning,
+  author  = {Hysa, Endi},
+  title   = {Aligning 3D and Text Latent Spaces: An Empirical Study of Alignment Methods},
+  school  = {University of Padova},
+  year    = {2026},
+  type    = {Master's Thesis},
+  note    = {Supervisor: Marco Fiorucci}
+}
 ```
 
-Yeah, well, not actually all of them. Let's break down their purpose down here
+## Acknowledgements
 
-<details>
-<summary>Read more</summary>
+This work builds directly on the supervised alignment framework proposed by Hadgi et al. in *["Escaping Plato's Cave"](https://arxiv.org/abs/2503.05283)* (CVPR 2025), and evaluates it alongside the Gromov-Wasserstein theory of Vayer et al. and the diagnostic methodology of Li et al. The external verification uses the exact QAP solver introduced by Schnaus, Araslanov, and Cremers in *["It's a (Blind) Match!"](https://arxiv.org/abs/2503.24129)* (CVPR 2025).
 
-- `config/`
-    - `variables.tex`: the first file you want to look into.
-    It defines all the variables that will be used to automatically fill some contents of the document, such as the title, your name, your professor etc.
-    It also fills the final PDF file metadata fields.
-    - `thesis-config.tex`: some custom commands definitions and package-specific configurations.
-    If you feel adventurous enough you can tune them to your preferences, but the provided ones should be ok
-    - `packages.tex`: should be pretty much self-explanatory.
-    Just the declaration of all the packages used in the project.
-    Nothing relevant to see here
-- `preface/`: all those pages you find before the actual chapters are gathered here:
-    - `summary.tex`: in here you briefly explain what the thesis is about.
-    You shouldn't spend much effort on this, just look at what's already in there and adapt it to your experience
-    - `acknowledgements.tex`: should be clear by itself. Just remember to thank your professor first
-    - `dedication.tex`: contains a small dedication with famous quote
-    - `title-page.tex`: declares the structure of the front page.
-    Everything is automatic and the various names, such as your name, you thesis title, your professor etc get filled from those variables you set in `config/variables.tex`.
-    If your thesis has a very long title you may need to slightly adjust some spacing, in order to keep a decent layout
-    - `table-of-contents.tex`: generates the table of contents. Nothing to see here
-    - `copyright.tex`: it's nothing special, just that blank page with copyright
-- `chapters/`: the real stuff is placed here.
-This is the directory you will spend most of your time in, writing the main content.
-You will already find some example chapters in there, which are meant to show you how to use the template and to give an example of the structure of a thesis. \
-Use file names that reflect the content of the chapter, avoid calling them `chapter-03.tex`.
-When creating, deleting or editing chapters remember that you have to put them in `structure.tex` too
-- `structure.tex`: this doesn't contain any actual content at all.
-It just sets down the structure of the document, importing other files in the right order.
-You may occasionally need to put some new chapters you will write, but apart from that there's not much to do here
-- `thesis.tex`: the root file of your thesis. As you can read above it is the only file to compile, in order to get the final PDF. Nothing more to say
-- `printable-thesis.tex`: yet another root file.
-When compiled, this one produces a version that is more fit to be printed as an elegant sweet physical copy, than to be viewed on your favorite PDF reader.
-It provides asymmetrical margins, chapters openings on the right and no links highlighting
-- `images/`: where the template will look for images, when including one
-- `appendix/`: contains the last chapters, such as custom appendix chapters, bibliography and glossary
-    - `bibliography.bib`: where you put actual bibliography content
-    - `glossary-entries.tex:` where you put your glossary definitions, following the syntax of the example terms
-    - `bibliography.tex`: the automatic structure of bibliography. No need to change anything here
+## License
 
-</details>
+This repository is released under the [MIT License](./LICENSE). See the `LICENSE` file for details.
 
----
+## Contact
 
-Remember not to unconditionally stick with this structure, as it's just an example.
-If you feel you don't need this chapter or that section, or you prefer a different order and organization of the content do as you want.
-
-Before really starting to write actual content you should take some time to think about the structure of your chapters, filling them with the (empty) sections you will then develop, as it should help later on, avoiding to constantly rewrite and reorder stuff.
+Endi Hysa — [endi.hysa@studenti.unipd.it](mailto:endi.hysa@studenti.unipd.it)
